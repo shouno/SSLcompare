@@ -8,3 +8,6 @@ joblib
 pandas
 Pillow
 six
+#
+lightning
+wandb

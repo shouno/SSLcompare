@@ -35,20 +35,22 @@ RUN groupadd --gid $USER_GID $USERNAME \
     && echo $USERNAME ALL=\(root\) NOPASSWD:ALL > /etc/sudoers.d/$USERNAME \
     && chmod 0440 /etc/sudoers.d/$USERNAME
 
+# bash as default shell
+RUN chsh -s /bin/bash ${USERNAME}
+COPY --chown=${USERNAME}:${USERNAME} .bashrc /home/${USERNAME}/.bashrc
+
+
 # 4. Pythonライブラリのインストール
-# まず、requirements.txtをコピーしてインストールします。
 # この時点ではrootユーザーで実行しています。
-COPY requirements.txt /tmp/requirements.txt
+RUN python3 -m pip install --no-cache-dir torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
+
+
+# 5. 次にrequirements.txtの内容をインストール
+# PyTorchがすでにあるため、依存関係として再インストールされることはありません。
+COPY --chown=${USERNAME}:${USERNAME} requirements.txt /tmp/requirements.txt
 RUN python3 -m pip install --no-cache-dir -r /tmp/requirements.txt
 
-# 作成したユーザーでPyTorchなどのライブラリをインストールします。
-USER $USERNAME
-WORKDIR /home/$USERNAME
-# PyTorch for CUDA 12.1
-RUN python3 -m pip install --no-cache-dir torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
-RUN python3 -m pip install lightning wandb
-
-
-# 5. ワークスペースの設定
+# 6. ワークスペースの設定
 # コンテナ内の作業ディレクトリを指定します。
+USER $USERNAME
 WORKDIR /workspace
