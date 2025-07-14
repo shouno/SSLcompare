@@ -3,6 +3,8 @@ import torch.nn as nn
 import torchvision.transforms as T
 from typing import Optional
 from torch.utils.data import DataLoader
+from torchvision.datasets import CIFAR10
+
 import pytorch_lightning as pl
 
 ###############################################
@@ -99,3 +101,18 @@ class ImageNetDataModule(pl.LightningDataModule):
             drop_last=True,
             persistent_workers=True if self.num_workers > 0 else False,
         )
+
+
+class CIFAR10DataModule(pl.LightningDataModule):
+    def __init__(self, data_dir, batch_size: int = 256, num_workers: int = 8):
+        super().__init__()
+        self.data_dir, self.batch_size, self.num_workers = data_dir, batch_size, num_workers
+
+    def setup(self, stage=None):
+        self.ds = CIFAR10(self.data_dir, train=True, download=True,
+                          transform=SSLTransform(input_size=32))
+
+    def train_dataloader(self):
+        return DataLoader(self.ds, batch_size=self.batch_size,
+                          shuffle=True, num_workers=self.num_workers,
+                          pin_memory=True, drop_last=True)

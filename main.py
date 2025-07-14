@@ -1,5 +1,11 @@
 import argparse
-from ssl_src.common
+import pytorch_lightning as pl
+from ssl_src.common import CIFAR10DataModule
+from ssl_src.simclr import SimCLRModule
+from ssl_src.byol import BYOLModule
+from ssl_src.simsiam import SimSiamModule
+from ssl_src.barlowtwins import BarlowTwinsModule
+from pytorch_lightning.loggers import WandbLogger
 
 
 def cli_main():
@@ -8,6 +14,8 @@ def cli_main():
                         default="simclr", help="SSL method to use")
     parser.add_argument("--data_dir", type=str,
                         required=True, help="Path to training data")
+    parser.add_argument("--dataset", type=str, choices=['imagenet', 'cifar10'],
+                        default="imagenet", help="Training dataset picker")
     parser.add_argument("--max_epochs", type=int, default=200,
                         help="Maximum number of epochs")
     parser.add_argument("--batch_size", type=int,
@@ -23,7 +31,7 @@ def cli_main():
                         default=0.996, help="EMA decay for BYOL")
     parser.add_argument("--lambd", type=float, default=5e-4,
                         help="Lambda for Barlow Twins")
-    parser.add_argument("--num_workers", type=int, default=8,
+    parser.add_argument("--num_workers", type=int, default=4,
                         help="Number of data loading workers")
     parser.add_argument("--precision", type=str,
                         default="16-mixed", help="Training precision")
@@ -32,12 +40,14 @@ def cli_main():
 
     args = parser.parse_args()
 
-    # Data module
-    dm = ImageNetDataModule(
-        data_dir=args.data_dir,
-        batch_size=args.batch_size,
-        num_workers=args.num_workers
-    )
+    if args.dataset == 'imagenet':
+        dm = ImageNetDataModule(
+            args.data_dir, batch_size=args.batch_size, num_workers=args.num_workers
+        )
+    else:
+        dm = CIFAR10DataModule(
+            args.data_dir, batch_size=args.batch_size, num_workers=args.num_workers
+        )
 
     # Model selection with method-specific parameters
     common_params = {
@@ -75,5 +85,5 @@ def cli_main():
     trainer.fit(model, dm)
 
 
-if __name__ = "__main__":
+if __name__ == "__main__":
     cli_main()

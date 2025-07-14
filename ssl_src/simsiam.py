@@ -3,11 +3,12 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from .base import BaseSSLModule
-
+from .common import ProjectionMLP, PredictionMLP
 
 ###############################################
 # 5. SimSiam
 ###############################################
+
 
 class SimSiamModule(BaseSSLModule):
     def __init__(self, **kwargs):

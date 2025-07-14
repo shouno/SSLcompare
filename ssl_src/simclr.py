@@ -3,6 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from .base import BaseSSLModule
+from .common import ProjectionMLP
 
 ###############################################
 # 3. SimCLR
