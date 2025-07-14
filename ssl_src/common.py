@@ -3,6 +3,8 @@ import torch.nn as nn
 import torchvision.transforms as T
 from typing import Optional
 from torch.utils.data import DataLoader
+import pytorch_lightning as pl
+
 ###############################################
 # Common building blocks
 #    - Projection header
