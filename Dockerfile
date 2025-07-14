@@ -38,7 +38,7 @@ RUN groupadd --gid $USER_GID $USERNAME \
 # bash as default shell
 RUN chsh -s /bin/bash ${USERNAME}
 COPY --chown=${USERNAME}:${USERNAME} .bashrc /home/${USERNAME}/.bashrc
-
+COPY --chown=${USERNAME}:${USERNAME} .tmux.conf /home/${USERNAME}/.tmux.conf
 
 # 4. Pythonライブラリのインストール
 # この時点ではrootユーザーで実行しています。
@@ -53,4 +53,8 @@ RUN python3 -m pip install --no-cache-dir -r /tmp/requirements.txt
 # 6. ワークスペースの設定
 # コンテナ内の作業ディレクトリを指定します。
 USER $USERNAME
+<<<<<<< HEAD
 WORKDIR /workspace
+=======
+WORKDIR /workspace
+>>>>>>> f2136a7 (設定関連)
