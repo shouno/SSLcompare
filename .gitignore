@@ -1,4 +1,6 @@
 #
+wandb/
+#
 *.svg
 *.pdf
 *.mp4
