@@ -1,5 +1,5 @@
 import argparse
-from .common
+from ssl_src.common
 
 
 def cli_main():

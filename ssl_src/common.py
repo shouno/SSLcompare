@@ -8,7 +8,7 @@ import pytorch_lightning as pl
 ###############################################
 # Common building blocks
 #    - Projection header
-# .   - Prediction header
+#    - Prediction header
 ###############################################
 
 
