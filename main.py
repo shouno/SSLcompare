@@ -75,13 +75,22 @@ def cli_main():
 
     if args.dataset == "imagenet":
         dm = ImageNetDataModule(
-            args.data_dir, batch_size=args.batch_size, num_workers=args.num_workers
+            data_dir=args.data_dir,
+            method=args.method,
+            batch_size=args.batch_size,
+            num_workers=args.num_workers,
+            n_local_crops=args.n_local_crops,  # for only SwAV
         )
     else:
         dm = CIFAR10DataModule(
-            args.data_dir, batch_size=args.batch_size, num_workers=args.num_workers
+            data_dir=args.data_dir,
+            method=args.method,
+            batch_size=args.batch_size,
+            num_workers=args.num_workers,
+            n_local_crops=args.n_local_crops,  # for only SwAV
         )
-
+        if args.patch_size == 16:  # デフォルト値なら変更
+            args.patch_size = 4
     # Model selection with method-specific parameters
     common_params = {
         "base_encoder": args.base_encoder,  # mae は使わないので渡さないように注意
