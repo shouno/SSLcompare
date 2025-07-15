@@ -51,22 +51,35 @@ class PredictionMLP(nn.Module):
 # DataModule & Augmentations
 ###############################################
 
+
 class SSLTransform:
     """Standard augmentations used by SimCLR-style methods."""
 
     def __init__(self, input_size: int = 224, strength: float = 1.0):
         self.strength = strength
-        self.train_transform = T.Compose([
-            T.RandomResizedCrop(input_size, scale=(0.2, 1.0)),
-            T.RandomHorizontalFlip(),
-            T.RandomApply([T.ColorJitter(0.4 * strength, 0.4 *
-                          strength, 0.4 * strength, 0.1 * strength)], p=0.8),
-            T.RandomGrayscale(p=0.2),
-            T.RandomApply(
-                [T.GaussianBlur(kernel_size=23, sigma=(0.1, 2.0))], p=0.5),
-            T.ToTensor(),
-            T.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-        ])
+        self.train_transform = T.Compose(
+            [
+                T.RandomResizedCrop(input_size, scale=(0.2, 1.0)),
+                T.RandomHorizontalFlip(),
+                T.RandomApply(
+                    [
+                        T.ColorJitter(
+                            0.4 * strength,
+                            0.4 * strength,
+                            0.4 * strength,
+                            0.1 * strength,
+                        )
+                    ],
+                    p=0.8,
+                ),
+                T.RandomGrayscale(p=0.2),
+                T.RandomApply(
+                    [T.GaussianBlur(kernel_size=23, sigma=(0.1, 2.0))], p=0.5
+                ),
+                T.ToTensor(),
+                T.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+            ]
+        )
 
     def __call__(self, x):
         x1 = self.train_transform(x)
@@ -74,9 +87,62 @@ class SSLTransform:
         return (x1, x2)
 
 
+class SwAVTransform:
+    def __init__(self, input_size: int = 224, n_local_crops: int = 6):
+        self.n_local_crops = n_local_crops
+        # Two global crops
+        self.global_transform1 = T.Compose(
+            [
+                T.RandomResizedCrop(input_size, scale=(0.14, 1.0)),
+                T.RandomHorizontalFlip(),
+                T.RandomApply([T.ColorJitter(0.8, 0.8, 0.8, 0.2)], p=0.8),
+                T.RandomGrayscale(p=0.2),
+                T.ToTensor(),
+                T.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+            ]
+        )
+        # Several local crops
+        self.local_transform = T.Compose(
+            [
+                T.RandomResizedCrop(96, scale=(0.05, 0.14)),
+                T.RandomHorizontalFlip(),
+                T.RandomApply([T.ColorJitter(0.8, 0.8, 0.8, 0.2)], p=0.8),
+                T.RandomGrayscale(p=0.2),
+                T.ToTensor(),
+                T.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+            ]
+        )
+
+    def __call__(self, x):
+        crops = [self.global_transform1(x), self.global_transform1(x)]
+        crops.extend([self.local_transform(x) for _ in range(self.n_local_crops)])
+        return crops
+
+
+class MAETransform:
+    def __init__(self, input_size: int = 224):
+        self.transform = T.Compose(
+            [
+                T.RandomResizedCrop(input_size, scale=(0.2, 1.0)),
+                T.RandomHorizontalFlip(),
+                T.ToTensor(),
+                T.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+            ]
+        )
+
+    def __call__(self, x):
+        return self.transform(x)  # Returns a single image
+
+
 class ImageNetDataModule(pl.LightningDataModule):
-    def __init__(self, data_dir: str, batch_size: int = 256, num_workers: int = 8,
-                 input_size: int = 224, augmentation_strength: float = 1.0):
+    def __init__(
+        self,
+        data_dir: str,
+        batch_size: int = 256,
+        num_workers: int = 8,
+        input_size: int = 224,
+        augmentation_strength: float = 1.0,
+    ):
         super().__init__()
         self.data_dir = data_dir
         self.batch_size = batch_size
@@ -86,9 +152,10 @@ class ImageNetDataModule(pl.LightningDataModule):
 
     def setup(self, stage: Optional[str] = None):
         from torchvision.datasets import ImageFolder
+
         self.dataset = ImageFolder(
             self.data_dir,
-            transform=SSLTransform(self.input_size, self.augmentation_strength)
+            transform=SSLTransform(self.input_size, self.augmentation_strength),
         )
 
     def train_dataloader(self):
@@ -106,13 +173,26 @@ class ImageNetDataModule(pl.LightningDataModule):
 class CIFAR10DataModule(pl.LightningDataModule):
     def __init__(self, data_dir, batch_size: int = 256, num_workers: int = 8):
         super().__init__()
-        self.data_dir, self.batch_size, self.num_workers = data_dir, batch_size, num_workers
+        self.data_dir, self.batch_size, self.num_workers = (
+            data_dir,
+            batch_size,
+            num_workers,
+        )
 
     def setup(self, stage=None):
-        self.ds = CIFAR10(self.data_dir, train=True, download=True,
-                          transform=SSLTransform(input_size=32))
+        self.ds = CIFAR10(
+            self.data_dir,
+            train=True,
+            download=True,
+            transform=SSLTransform(input_size=32),
+        )
 
     def train_dataloader(self):
-        return DataLoader(self.ds, batch_size=self.batch_size,
-                          shuffle=True, num_workers=self.num_workers,
-                          pin_memory=True, drop_last=True)
+        return DataLoader(
+            self.ds,
+            batch_size=self.batch_size,
+            shuffle=True,
+            num_workers=self.num_workers,
+            pin_memory=True,
+            drop_last=True,
+        )

@@ -10,37 +10,68 @@ from pytorch_lightning.loggers import WandbLogger
 
 def cli_main():
     parser = argparse.ArgumentParser(description="SSL Benchmark Trainer")
-    parser.add_argument("--method", type=str, choices=["simclr", "byol", "simsiam", "barlow"],
-                        default="simclr", help="SSL method to use")
-    parser.add_argument("--data_dir", type=str,
-                        required=True, help="Path to training data")
-    parser.add_argument("--dataset", type=str, choices=['imagenet', 'cifar10'],
-                        default="imagenet", help="Training dataset picker")
-    parser.add_argument("--max_epochs", type=int, default=200,
-                        help="Maximum number of epochs")
-    parser.add_argument("--batch_size", type=int,
-                        default=256, help="Batch size")
+    parser.add_argument(
+        "--method",
+        type=str,
+        choices=["simclr", "byol", "simsiam", "barlow", "swav", "mae"],
+        default="simclr",
+        help="SSL method to use",
+    )
+    parser.add_argument(
+        "--dataset",
+        type=str,
+        choices=["imagenet", "cifar10"],
+        default="imagenet",
+        help="Training dataset picker",
+    )
+    parser.add_argument(
+        "--data_dir", type=str, required=True, help="Path to training data"
+    )
+    parser.add_argument(
+        "--max_epochs", type=int, default=200, help="Maximum number of epochs"
+    )
+    parser.add_argument("--batch_size", type=int, default=256, help="Batch size")
     parser.add_argument("--lr", type=float, default=0.2, help="Learning rate")
-    parser.add_argument("--weight_decay", type=float,
-                        default=1e-6, help="Weight decay")
-    parser.add_argument("--base_encoder", type=str,
-                        default="resnet50", help="Base encoder architecture")
-    parser.add_argument("--temperature", type=float,
-                        default=0.2, help="Temperature for SimCLR")
-    parser.add_argument("--ema_decay", type=float,
-                        default=0.996, help="EMA decay for BYOL")
-    parser.add_argument("--lambd", type=float, default=5e-4,
-                        help="Lambda for Barlow Twins")
-    parser.add_argument("--num_workers", type=int, default=4,
-                        help="Number of data loading workers")
-    parser.add_argument("--precision", type=str,
-                        default="16-mixed", help="Training precision")
-    parser.add_argument("--project_name", type=str,
-                        default="ssl-benchmark", help="WandB project name")
+    parser.add_argument("--weight_decay", type=float, default=1e-6, help="Weight decay")
+    parser.add_argument(
+        "--base_encoder",
+        type=str,
+        default="resnet50",
+        help="Base encoder architecture (ignored by MAE)",
+    )
+    parser.add_argument(
+        "--num_workers", type=int, default=8, help="Number of data loading workers"
+    )
+    parser.add_argument(
+        "--precision", type=str, default="16-mixed", help="Training precision"
+    )
+    parser.add_argument(
+        "--project_name", type=str, default="ssl-benchmark", help="WandB project name"
+    )
+
+    # Method-specific arguments
+    parser.add_argument(
+        "--temperature", type=float, default=0.2, help="Temperature for SimCLR/SwAV"
+    )
+    parser.add_argument(
+        "--ema_decay", type=float, default=0.996, help="EMA decay for BYOL"
+    )
+    parser.add_argument(
+        "--lambd", type=float, default=5e-4, help="Lambda for Barlow Twins"
+    )
+    parser.add_argument(
+        "--n_prototypes", type=int, default=3000, help="Number of prototypes for SwAV"
+    )
+    parser.add_argument(
+        "--n_local_crops", type=int, default=6, help="Number of local crops for SwAV"
+    )
+    parser.add_argument(
+        "--mask_ratio", type=float, default=0.75, help="Masking ratio for MAE"
+    )
 
     args = parser.parse_args()
 
-    if args.dataset == 'imagenet':
+    if args.dataset == "imagenet":
         dm = ImageNetDataModule(
             args.data_dir, batch_size=args.batch_size, num_workers=args.num_workers
         )
@@ -64,11 +95,25 @@ def cli_main():
         model = SimSiamModule(**common_params)
     elif args.method == "barlow":
         model = BarlowTwinsModule(lambd=args.lambd, **common_params)
+    elif args.method == "swav":
+        model = SwAVModule(
+            temperature=args.temperature,
+            n_prototypes=args.n_prototypes,
+            n_local_crops=args.n_local_crops,
+            **common_params,
+        )
+    elif args.method == "mae":
+        # MAE has its own LR and WD recommendations
+        # Overriding for MAE specifically
+        mae_params = common_params.copy()
+        mae_params["lr"] = 1.5e-4
+        mae_params["weight_decay"] = 0.05
+        model = MAEModule(mask_ratio=args.mask_ratio, **mae_params)
 
     # Logger
     wandb_logger = WandbLogger(
-        project=args.project_name, name=f"{args.method}_{args.base_encoder}")
-
+        project=args.project_name, name=f"{args.method}_{args.base_encoder}"
+    )
     # Trainer
     trainer = pl.Trainer(
         logger=wandb_logger,
