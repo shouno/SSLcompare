@@ -215,7 +215,7 @@ class CIFAR10DataModule(pl.LightningDataModule):
 
     def setup(self, stage: Optional[str] = None):
         # torchvision から CIFAR10 をダウンロード読み込み
-        self.dataset = T.dataset.CIFAR10(
+        self.dataset = CIFAR10(
             self.data_dir, train=True, transform=self.transform, download=True
         )
 
