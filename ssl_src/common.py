@@ -177,33 +177,124 @@ class ImageNetDataModule(pl.LightningDataModule):
 
 
 class CIFAR10DataModule(pl.LightningDataModule):
-    def __init__(self, data_dir, batch_size: int = 256, num_workers: int = 8):
+    def __init__(
+        self,
+        data_dir: str,
+        method: str,
+        batch_size: int = 256,
+        num_workers: int = 8,
+        **kwargs
+    ):
         super().__init__()
-        self.data_dir, self.batch_size, self.num_workers = (
-            data_dir,
-            batch_size,
-            num_workers,
-        )
+        self.data_dir = data_dir
+        self.method = method
+        self.batch_size = batch_size
+        self.num_workers = num_workers
 
-    def setup(self, stage=None):
+        # CIFAR-10 の画像サイズ
         input_size = 32
+
+        # CIFAR-10用の正規化パラメータ
+        self.cifar10_mean = (0.4914, 0.4822, 0.4465)
+        self.cifar10_std = (0.2470, 0.2435, 0.2616)
+
         if self.method == "swav":
-            transform = SwAVTransform(
-                input_size, self.transform_kwargs.get("n_local_crops", 6)
+            self.transform = SwAVTransformCIFAR10(
+                mean=self.cifar10_mean,
+                std=self.cifar10_std,
+                n_local_crops=kwargs.get("n_local_crops", 6),
             )
         elif self.method == "mae":
-            transform = MAETransform(input_size)
-        else:
-            transform = SSLTransform(input_size)
+            self.transform = MAETransformCIFAR10(
+                input_size=input_size, mean=self.cifar10_mean, std=self.cifar10_std
+            )
+        else:  # SimCLR, BYOL, BarlowTwins
+            self.transform = SSLTransformCIFAR10(
+                input_size=input_size, mean=self.cifar10_mean, std=self.cifar10_std
+            )
 
-        self.ds = CIFAR10(self.data_dir, train=True, download=True, transform=transform)
+    def setup(self, stage: Optional[str] = None):
+        # torchvision から CIFAR10 をダウンロード読み込み
+        self.dataset = T.dataset.CIFAR10(
+            self.data_dir, train=True, transform=self.transform, download=True
+        )
 
     def train_dataloader(self):
         return DataLoader(
-            self.ds,
+            self.dataset,
             batch_size=self.batch_size,
             shuffle=True,
             num_workers=self.num_workers,
             pin_memory=True,
             drop_last=True,
         )
+
+
+class SSLTransformCIFAR10:
+    def __init__(
+        self, input_size=32, mean=(0.4914, 0.4822, 0.4465), std=(0.2470, 0.2435, 0.2616)
+    ):
+        self.transform = T.Compose(
+            [
+                T.RandomResizedCrop(
+                    input_size, scale=(0.2, 1.0)
+                ),  # スケールはImageNetと同じでも可
+                T.RandomHorizontalFlip(),
+                T.RandomApply([T.ColorJitter(0.4, 0.4, 0.4, 0.1)], p=0.8),
+                T.RandomGrayscale(p=0.2),
+                T.ToTensor(),
+                T.Normalize(mean, std),
+            ]
+        )
+
+    def __call__(self, x):
+        return self.transform(x), self.transform(x)
+
+
+class SwAVTransformCIFAR10:
+    def __init__(self, mean, std, n_local_crops=6):
+        self.n_local_crops = n_local_crops
+        # グローバルビューは32x32
+        self.global_transform = T.Compose(
+            [
+                T.RandomResizedCrop(32, scale=(0.14, 1.0)),
+                T.RandomHorizontalFlip(),
+                T.RandomApply([T.ColorJitter(0.8, 0.8, 0.8, 0.2)], p=0.8),
+                T.RandomGrayscale(p=0.2),
+                T.ToTensor(),
+                T.Normalize(mean, std),
+            ]
+        )
+        # ローカルビューは小さく (例: 16x16)
+        self.local_transform = T.Compose(
+            [
+                T.RandomResizedCrop(16, scale=(0.05, 0.14)),
+                T.RandomHorizontalFlip(),
+                T.RandomApply([T.ColorJitter(0.8, 0.8, 0.8, 0.2)], p=0.8),
+                T.RandomGrayscale(p=0.2),
+                T.ToTensor(),
+                T.Normalize(mean, std),
+            ]
+        )
+
+    def __call__(self, x):
+        crops = [self.global_transform(x), self.global_transform(x)]
+        crops.extend([self.local_transform(x) for _ in range(self.n_local_crops)])
+        return crops
+
+
+class MAETransformCIFAR10:
+    def __init__(
+        self, input_size=32, mean=(0.4914, 0.4822, 0.4465), std=(0.2470, 0.2435, 0.2616)
+    ):
+        self.transform = T.Compose(
+            [
+                T.RandomResizedCrop(input_size, scale=(0.2, 1.0)),
+                T.RandomHorizontalFlip(),
+                T.ToTensor(),
+                T.Normalize(mean, std),
+            ]
+        )
+
+    def __call__(self, x):
+        return self.transform(x)
