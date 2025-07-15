@@ -153,10 +153,14 @@ class ImageNetDataModule(pl.LightningDataModule):
     def setup(self, stage: Optional[str] = None):
         from torchvision.datasets import ImageFolder
 
-        self.dataset = ImageFolder(
-            self.data_dir,
-            transform=SSLTransform(self.input_size, self.augmentation_strength),
-        )
+        # Select transform based on the method
+        if self.method == 'swav':
+            transform = SwAVTransform(self.input_size, self.transform_kwargs.get('n_local_crops', 6))
+        elif self.method == 'mae':
+            transform = MAETransform(self.input_size)
+        else: # Default for SimCLR, BYOL, etc.
+            transform = SSLTransform(self.input_size)
+        self.dataset = ImageFolder(self.data_dir, transform=transform)
 
     def train_dataloader(self):
         return DataLoader(
@@ -180,11 +184,18 @@ class CIFAR10DataModule(pl.LightningDataModule):
         )
 
     def setup(self, stage=None):
+        if self.method == 'swav':
+            transform = SwAVTransform(input_size=32, self.transform_kwargs.get('n_local_crops', 6))
+        elif self.method == 'mae':
+            transform = MAETransform(input_size=32)
+        else:
+            transform = SSLTransform(input_size=32)
+        
         self.ds = CIFAR10(
             self.data_dir,
             train=True,
             download=True,
-            transform=SSLTransform(input_size=32),
+            transform=transform
         )
 
     def train_dataloader(self):
