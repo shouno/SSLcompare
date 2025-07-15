@@ -84,7 +84,7 @@ def cli_main():
 
     # Model selection with method-specific parameters
     common_params = {
-        "base_encoder": args.base_encoder,
+        "base_encoder": args.base_encoder,  # mae は使わないので渡さないように注意
         "lr": args.lr,
         "weight_decay": args.weight_decay,
     }
@@ -108,6 +108,7 @@ def cli_main():
         # MAE has its own LR and WD recommendations
         # Overriding for MAE specifically
         mae_params = common_params.copy()
+        mae_params.pop("base_encoder")  # base_encoder は ViT 固定なので渡さない
         mae_params["lr"] = 1.5e-4
         mae_params["weight_decay"] = 0.05
         model = MAEModule(mask_ratio=args.mask_ratio, **mae_params)
