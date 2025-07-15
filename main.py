@@ -5,6 +5,8 @@ from ssl_src.simclr import SimCLRModule
 from ssl_src.byol import BYOLModule
 from ssl_src.simsiam import SimSiamModule
 from ssl_src.barlowtwins import BarlowTwinsModule
+from ssl_src.swav import SwAVModule
+from ssl_src.mae import MAEModule
 from pytorch_lightning.loggers import WandbLogger
 
 
