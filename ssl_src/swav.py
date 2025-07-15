@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
+from typing import List
 from .base import BaseSSLModule
 from .common import ProjectionMLP, PredictionMLP
 
@@ -38,22 +38,30 @@ class SwAVModule(BaseSSLModule):
             Q *= (c / torch.sum(Q, dim=0)).unsqueeze(0)
         return (Q / torch.sum(Q, dim=0, keepdim=True)).T
 
-    def _swapped_prediction_loss(self, scores, assignments):
+    def _swapped_prediction_loss(self, scores: List[torch.Tensor], assignments: List[torch.Tensor]) -> torch.Tensor:
+        """
+        Computes the swapped prediction loss for SwAV.
+        'scores' contains embeddings from all crops.
+        'assignments' contains cluster assignments from global crops only.
+        """
         loss = 0.0
-        for i in range(len(scores)):
-            for j in range(len(scores)):
+        # 全てのビュー（グローバル＋ローカル）をループ
+        for i, score in enumerate(scores):
+            # ターゲットとなるグローバルビューの割り当てをループ
+            for j, assignment in enumerate(assignments):
+                # グローバルビューが自分自身の割り当てを予測するのをスキップ
+                # (最初のlen(assignments)個のscoreがグローバルビューのものと仮定)
                 if i == j:
                     continue
-                # Cross-entropy between prototype scores of view i and assignments of view j
-                l = -torch.mean(
-                    torch.sum(
-                        assignments[j]
-                        * F.log_softmax(scores[i] / self.hparams.temperature, dim=1),
-                        dim=1,
-                    )
-                )
+                
+                # score i を使って assignment j を予測する際のクロスエントロピー損失
+                l = -torch.mean(torch.sum(assignment * F.log_softmax(score / self.hparams.temperature, dim=1), dim=1))
                 loss += l
-        return loss / (len(scores) * (len(scores) - 1))
+        
+        # 損失項の数で正規化
+        # 全組み合わせ - 自分自身の組み合わせ
+        n_terms = len(scores) * len(assignments) - len(assignments)
+        return loss / n_terms
 
     def training_step(self, batch, batch_idx):
         # Batch is a list of crops from SwAVTransform
