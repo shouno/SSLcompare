@@ -67,6 +67,7 @@ def cli_main():
     parser.add_argument(
         "--n_local_crops", type=int, default=6, help="Number of local crops for SwAV"
     )
+    parser.add_argument("--patch_size", type=int, default=16, help="Patch size for MAE")
     parser.add_argument(
         "--mask_ratio", type=float, default=0.75, help="Masking ratio for MAE"
     )
