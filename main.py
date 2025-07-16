@@ -212,11 +212,10 @@ def cli_main():
         check_val_every_n_epoch=10,  # Validation can be added later
         default_root_dir=checkpoint_dir,  # ログとチェックポイントの保存先
         enable_checkpointing=True,
-        resume_from_checkpoint=args.resume_from_checkpoint,  # 学習の再開
     )
 
     # Train
-    trainer.fit(model, dm)
+    trainer.fit(model, dm, ckpt_path=args.resume_from_checkpoint)  # 学習の再開
     
     # Save final model info
     print(f"\nTraining completed!")
