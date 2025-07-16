@@ -38,13 +38,17 @@ class SwAVModule(BaseSSLModule):
             Q *= (c / torch.sum(Q, dim=0)).unsqueeze(0)
         return (Q / torch.sum(Q, dim=0, keepdim=True)).T
 
-    def _swapped_prediction_loss(self, scores: List[torch.Tensor], assignments: List[torch.Tensor]) -> torch.Tensor:
+    def _swapped_prediction_loss(
+        self, scores: List[torch.Tensor], assignments: List[torch.Tensor]
+    ) -> torch.Tensor:
         """
         Computes the swapped prediction loss for SwAV.
         'scores' contains embeddings from all crops.
         'assignments' contains cluster assignments from global crops only.
         """
         loss = 0.0
+        n_terms = 0
+
         # 全てのビュー（グローバル＋ローカル）をループ
         for i, score in enumerate(scores):
             # ターゲットとなるグローバルビューの割り当てをループ
@@ -53,15 +57,20 @@ class SwAVModule(BaseSSLModule):
                 # (最初のlen(assignments)個のscoreがグローバルビューのものと仮定)
                 if i == j:
                     continue
-                
+
                 # score i を使って assignment j を予測する際のクロスエントロピー損失
-                l = -torch.mean(torch.sum(assignment * F.log_softmax(score / self.hparams.temperature, dim=1), dim=1))
+                l = -torch.mean(
+                    torch.sum(
+                        assignment
+                        * F.log_softmax(score / self.hparams.temperature, dim=1),
+                        dim=1,
+                    )
+                )
                 loss += l
-        
+                n_terms += 1
+
         # 損失項の数で正規化
-        # 全組み合わせ - 自分自身の組み合わせ
-        n_terms = len(scores) * len(assignments) - len(assignments)
-        return loss / n_terms
+        return loss / n_terms if n_terms > 0 else loss
 
     def training_step(self, batch, batch_idx):
         # Batch is a list of crops from SwAVTransform

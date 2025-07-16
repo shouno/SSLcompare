@@ -11,6 +11,8 @@ class PatchEmbed(nn.Module):
 
     def __init__(self, img_size=224, patch_size=16, in_chans=3, embed_dim=768):
         super().__init__()
+        self.img_size = img_size
+        self.patch_size = patch_size
         self.proj = nn.Conv2d(
             in_chans, embed_dim, kernel_size=patch_size, stride=patch_size
         )
@@ -75,9 +77,20 @@ class MAEModule(BaseSSLModule):
         mask_ratio=0.75,
         **kwargs
     ):
+        # CIFAR-10用の調整
+        if img_size == 224 and patch_size == 4:  # CIFAR-10の場合
+            img_size = 32
+            # より小さいモデルを使用
+            embed_dim = 384
+            encoder_depth = 6
+            num_heads = 6
+            decoder_embed_dim = 256
+            decoder_depth = 4
+            decoder_num_heads = 8
+
         # Override base_encoder as MAE uses a specific ViT architecture
         super().__init__(base_encoder="vit_mae", **kwargs)
-        self.save_hyperparameters("mask_ratio", "embed_dim", "decoder_embed_dim")
+        self.save_hyperparameters()
 
         # 1. Encoder
         self.patch_embed = PatchEmbed(img_size, patch_size, 3, embed_dim)
@@ -103,9 +116,25 @@ class MAEModule(BaseSSLModule):
         # 3. Prediction Head
         self.decoder_pred = nn.Linear(decoder_embed_dim, patch_size**2 * 3, bias=True)
 
+        # Initialize weights
+        self._init_weights()
+
+    def _init_weights(self):
+        # Initialize patch embedding
+        w = self.patch_embed.proj.weight.data
+        torch.nn.init.xavier_uniform_(w.view([w.shape[0], -1]))
+
+        # Initialize position embeddings
+        torch.nn.init.normal_(self.pos_embed, std=0.02)
+        torch.nn.init.normal_(self.decoder_pos_embed, std=0.02)
+
+        # Initialize other parameters
+        torch.nn.init.normal_(self.cls_token, std=0.02)
+        torch.nn.init.normal_(self.mask_token, std=0.02)
+
     def _patchify(self, imgs):
         """imgs: (B, 3, H, W) -> (B, L, patch_size**2 * 3)"""
-        p = self.patch_embed.proj.kernel_size[0]
+        p = self.patch_embed.patch_size
         h = w = imgs.shape[2] // p
         x = imgs.reshape(shape=(imgs.shape[0], 3, h, p, w, p))
         x = torch.einsum("nchpwq->nhwpqc", x)
@@ -114,7 +143,7 @@ class MAEModule(BaseSSLModule):
 
     def _unpatchify(self, x):
         """x: (B, L, patch_size**2 * 3) -> (B, 3, H, W)"""
-        p = self.patch_embed.proj.kernel_size[0]
+        p = self.patch_embed.patch_size
         h = w = int(x.shape[1] ** 0.5)
         x = x.reshape(shape=(x.shape[0], h, w, p, p, 3))
         x = torch.einsum("nhwpqc->nchpwq", x)
@@ -184,12 +213,13 @@ class MAEModule(BaseSSLModule):
 
     def forward_loss(self, imgs, pred, mask):
         target = self._patchify(imgs)
+
+        # MSE loss
         loss = (pred - target) ** 2
         loss = loss.mean(dim=-1)  # Loss per patch
 
         # Only consider masked patches for loss
-        mask = mask.view(-1)
-        loss = (loss.view(-1) * mask).sum() / mask.sum()
+        loss = (loss * mask).sum() / mask.sum()
         return loss
 
     def training_step(self, batch, batch_idx):
@@ -217,8 +247,17 @@ class MAEModule(BaseSSLModule):
             weight_decay=self.hparams.weight_decay,
             betas=(0.9, 0.95),
         )
-        # Cosine scheduler without warmup
+        # Cosine scheduler with warmup
+        warmup_steps = self.hparams.get("warmup_epochs", 10)
         sched = torch.optim.lr_scheduler.CosineAnnealingLR(
-            opt, T_max=self.trainer.max_epochs
+            opt, T_max=self.trainer.max_epochs - warmup_steps
         )
-        return [opt], [{"scheduler": sched, "interval": "epoch"}]
+
+        return {
+            "optimizer": opt,
+            "lr_scheduler": {
+                "scheduler": sched,
+                "interval": "epoch",
+                "frequency": 1,
+            },
+        }

@@ -1,6 +1,6 @@
 import argparse
 import pytorch_lightning as pl
-from ssl_src.common import CIFAR10DataModule
+from ssl_src.common import CIFAR10DataModule, ImageNetDataModule
 from ssl_src.simclr import SimCLRModule
 from ssl_src.byol import BYOLModule
 from ssl_src.simsiam import SimSiamModule
@@ -23,7 +23,7 @@ def cli_main():
         "--dataset",
         type=str,
         choices=["imagenet", "cifar10"],
-        default="imagenet",
+        default="cifar10",
         help="Training dataset picker",
     )
     parser.add_argument(
@@ -74,6 +74,14 @@ def cli_main():
 
     args = parser.parse_args()
 
+    # Adjust settings for CIFAR-10
+    if args.dataset == "cifar10":
+        if args.patch_size == 16:  # デフォルト値なら変更
+            args.patch_size = 4
+        # CIFAR-10の場合、n_prototypesも調整
+        if args.n_prototypes == 3000:
+            args.n_prototypes = 300  # CIFAR-10は10クラスなので少なくする
+
     if args.dataset == "imagenet":
         dm = ImageNetDataModule(
             data_dir=args.data_dir,
@@ -90,8 +98,7 @@ def cli_main():
             num_workers=args.num_workers,
             n_local_crops=args.n_local_crops,  # for only SwAV
         )
-        if args.patch_size == 16:  # デフォルト値なら変更
-            args.patch_size = 4
+
     # Model selection with method-specific parameters
     common_params = {
         "base_encoder": args.base_encoder,  # mae は使わないので渡さないように注意
@@ -116,17 +123,30 @@ def cli_main():
         )
     elif args.method == "mae":
         # MAE has its own LR and WD recommendations
-        # Overriding for MAE specifically
+        args.base_encoder = "vit"  # base_encoder は ViT 固定
         mae_params = common_params.copy()
-        mae_params.pop("base_encoder")  # base_encoder は ViT 固定なので渡さない
-        mae_params["lr"] = 1.5e-4
-        mae_params["weight_decay"] = 0.05
-        model = MAEModule(mask_ratio=args.mask_ratio, **mae_params)
+        mae_params.pop(
+            "base_encoder"
+        )  # base_encoder は ViT 固定なので渡さない(渡すと怒られる)
+        if args.dataset == "cifar10":
+            mae_params["lr"] = 1.5e-3  # CIFAR-10用により高い学習率
+            mae_params["weight_decay"] = 0.05
+            mae_params["img_size"] = 32
+            mae_params["patch_size"] = args.patch_size
+        else:
+            mae_params["lr"] = 1.5e-4
+            mae_params["weight_decay"] = 0.05
+            mae_params["img_size"] = 224
+            mae_params["patch_size"] = args.patch_size
+        mae_params["mask_ratio"] = args.mask_ratio
+        model = MAEModule(**mae_params)
 
     # Logger
     wandb_logger = WandbLogger(
-        project=args.project_name, name=f"{args.method}_{args.base_encoder}"
+        project=args.project_name,
+        name=f"{args.method}_{args.base_encoder}_{args.dataset}",
     )
+
     # Trainer
     trainer = pl.Trainer(
         logger=wandb_logger,
@@ -136,7 +156,15 @@ def cli_main():
         max_epochs=args.max_epochs,
         gradient_clip_val=1.0,  # Gradient clipping for stability
         log_every_n_steps=50,
-        check_val_every_n_epoch=10,  # Validation can be added later
+        check_val_every_n_epoch=10,
+        callbacks=[
+            pl.callbacks.LearningRateMonitor(logging_interval="epoch"),
+            pl.callbacks.ModelCheckpoint(
+                save_top_k=3,
+                monitor="train_loss",
+                mode="min",
+            ),
+        ],  # Validation can be added later
     )
 
     # Train

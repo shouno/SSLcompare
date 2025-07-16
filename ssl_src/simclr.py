@@ -16,32 +16,51 @@ class SimCLRModule(BaseSSLModule):
         self.projection = ProjectionMLP(self.feat_dim)
         self.temperature = temperature
 
-    def nt_xent(self, z: torch.Tensor) -> torch.Tensor:
+    def nt_xent(self, z1: torch.Tensor, z2: torch.Tensor) -> torch.Tensor:
         """NT-Xent loss computation."""
-        # z: [2B, D]
-        z = F.normalize(z, dim=1)
-        sim = torch.exp(z @ z.T / self.temperature)
-        mask = (~torch.eye(sim.size(0), dtype=bool, device=self.device)).float()
-        sim = sim * mask  # remove self-similarity
+        batch_size = z1.shape[0]
 
-        # positives are off-diagonal blocks
-        B = z.size(0) // 2
-        pos = torch.cat(
-            [torch.arange(B, 2 * B), torch.arange(0, B)]).to(self.device)
-        pos_sim = torch.diagonal(sim[:, pos])
-        loss = -torch.log(pos_sim / (sim.sum(dim=1) + 1e-8)
-                          )  # Add epsilon for stability
-        return loss.mean()
+        # Normalize embeddings
+        z1 = F.normalize(z1, dim=1)
+        z2 = F.normalize(z2, dim=1)
+
+        # Concatenate z1 and z2
+        representations = torch.cat([z1, z2], dim=0)
+
+        # Compute similarity matrix
+        similarity_matrix = F.cosine_similarity(
+            representations.unsqueeze(1), representations.unsqueeze(0), dim=2
+        )
+
+        # Create labels for positive pairs
+        # Positive pairs are (i, i+batch_size) and (i+batch_size, i)
+        labels = torch.cat(
+            [torch.arange(batch_size) + batch_size, torch.arange(batch_size)], dim=0
+        ).to(self.device)
+
+        # Mask to remove diagonal elements (self-similarity)
+        mask = torch.eye(labels.shape[0], dtype=bool).to(self.device)
+        similarity_matrix = similarity_matrix[~mask].view(
+            similarity_matrix.shape[0], -1
+        )
+
+        # Apply temperature
+        similarity_matrix = similarity_matrix / self.temperature
+
+        # Compute loss
+        loss = F.cross_entropy(similarity_matrix, labels)
+
+        return loss
 
     def training_step(self, batch, batch_idx):
         (x1, x2), _ = batch
         z1 = self.projection(self.encoder(x1))
         z2 = self.projection(self.encoder(x2))
-        loss = self.nt_xent(torch.cat([z1, z2], dim=0))
+        loss = self.nt_xent(z1, z2)
 
         # Log additional metrics
         self.log("train_loss", loss)
         self.log("temperature", self.temperature)
-        self.log("lr", self.trainer.optimizers[0].param_groups[0]['lr'])
+        self.log("lr", self.trainer.optimizers[0].param_groups[0]["lr"])
 
         return loss

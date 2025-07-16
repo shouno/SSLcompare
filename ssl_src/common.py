@@ -138,17 +138,21 @@ class ImageNetDataModule(pl.LightningDataModule):
     def __init__(
         self,
         data_dir: str,
+        method: str,
         batch_size: int = 256,
         num_workers: int = 8,
         input_size: int = 224,
         augmentation_strength: float = 1.0,
+        **kwargs
     ):
         super().__init__()
         self.data_dir = data_dir
+        self.method = method
         self.batch_size = batch_size
         self.num_workers = num_workers
         self.input_size = input_size
         self.augmentation_strength = augmentation_strength
+        self.transform_kwargs = kwargs
 
     def setup(self, stage: Optional[str] = None):
         from torchvision.datasets import ImageFolder
@@ -163,17 +167,6 @@ class ImageNetDataModule(pl.LightningDataModule):
         else:  # Default for SimCLR, BYOL, etc.
             transform = SSLTransform(self.input_size)
         self.dataset = ImageFolder(self.data_dir, transform=transform)
-
-    def train_dataloader(self):
-        return DataLoader(
-            self.dataset,
-            batch_size=self.batch_size,
-            shuffle=True,
-            num_workers=self.num_workers,
-            pin_memory=True,
-            drop_last=True,
-            persistent_workers=True if self.num_workers > 0 else False,
-        )
 
 
 class CIFAR10DataModule(pl.LightningDataModule):

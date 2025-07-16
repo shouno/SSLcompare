@@ -50,28 +50,54 @@ class BaseSSLModule(pl.LightningModule):
         raise NotImplementedError
 
     def configure_optimizers(self):
-        opt = torch.optim.SGD(
-            self.parameters(),
-            lr=self.hparams.lr,
-            weight_decay=self.hparams.weight_decay,
-            momentum=0.9,
-        )
+        # LARS optimizer for better performance with large batch sizes
+        # (SimCLR, BYOL, SwAV benefit from LARS)
+        if hasattr(self, "use_lars") and self.use_lars:
+            from torch.optim import SGD
 
-        # Warmup + Cosine scheduler
-        def lr_lambda(epoch):
-            if epoch < self.warmup_epochs:
-                return epoch / self.warmup_epochs
-            else:
-                return 0.5 * (
-                    1
-                    + torch.cos(
-                        torch.tensor(
-                            (epoch - self.warmup_epochs)
-                            / (self.trainer.max_epochs - self.warmup_epochs)
-                            * 3.14159
-                        )
-                    )
-                )
+            # LARS wrapper would go here if available
+            # For now, use SGD with adjusted LR
+            base_lr = self.hparams.lr
+            batch_size = (
+                self.trainer.datamodule.batch_size
+                if hasattr(self.trainer, "datamodule")
+                else 256
+            )
+            # Linear scaling rule
+            lr = base_lr * batch_size / 256
 
-        sched = torch.optim.lr_scheduler.LambdaLR(opt, lr_lambda)
-        return [opt], [{"scheduler": sched, "interval": "epoch"}]
+            opt = SGD(
+                self.parameters(),
+                lr=lr,
+                weight_decay=self.hparams.weight_decay,
+                momentum=0.9,
+            )
+        else:
+            opt = torch.optim.SGD(
+                self.parameters(),
+                lr=self.hparams.lr,
+                weight_decay=self.hparams.weight_decay,
+                momentum=0.9,
+            )
+
+        # Cosine annealing with linear warmup
+        def lr_lambda(current_epoch):
+            # Linear warmup
+            if current_epoch < self.warmup_epochs:
+                return float(current_epoch) / float(max(1, self.warmup_epochs))
+            # Cosine annealing
+            progress = float(current_epoch - self.warmup_epochs) / float(
+                max(1, self.trainer.max_epochs - self.warmup_epochs)
+            )
+            return 0.5 * (1.0 + torch.cos(torch.tensor(progress * 3.14159)))
+
+        scheduler = torch.optim.lr_scheduler.LambdaLR(opt, lr_lambda)
+
+        return {
+            "optimizer": opt,
+            "lr_scheduler": {
+                "scheduler": scheduler,
+                "interval": "epoch",
+                "frequency": 1,
+            },
+        }
