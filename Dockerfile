@@ -53,8 +53,5 @@ RUN python3 -m pip install --no-cache-dir -r /tmp/requirements.txt
 # 6. ワークスペースの設定
 # コンテナ内の作業ディレクトリを指定します。
 USER $USERNAME
-<<<<<<< HEAD
 WORKDIR /workspace
-=======
-WORKDIR /workspace
->>>>>>> f2136a7 (設定関連)
+

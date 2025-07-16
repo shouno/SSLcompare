@@ -8,6 +8,9 @@ from ssl_src.barlowtwins import BarlowTwinsModule
 from ssl_src.swav import SwAVModule
 from ssl_src.mae import MAEModule
 from pytorch_lightning.loggers import WandbLogger
+from pytorch_lightning.callbacks import ModelCheckpoint, LearningRateMonitor
+import os
+from datetime import datetime
 
 
 def cli_main():
@@ -50,6 +53,18 @@ def cli_main():
     parser.add_argument(
         "--project_name", type=str, default="ssl-benchmark", help="WandB project name"
     )
+    parser.add_argument(
+        "--checkpoint_dir", type=str, default="checkpoints", help="Directory to save checkpoints"
+    )
+    parser.add_argument(
+        "--save_top_k", type=int, default=3, help="Number of best checkpoints to save"
+    )
+    parser.add_argument(
+        "--save_every_n_epochs", type=int, default=50, help="Save checkpoint every N epochs"
+    )
+    parser.add_argument(
+        "--resume_from_checkpoint", type=str, default=None, help="Path to checkpoint to resume from"
+    )
 
     # Method-specific arguments
     parser.add_argument(
@@ -82,6 +97,7 @@ def cli_main():
         if args.n_prototypes == 3000:
             args.n_prototypes = 300  # CIFAR-10は10クラスなので少なくする
 
+    # Data module setup
     if args.dataset == "imagenet":
         dm = ImageNetDataModule(
             data_dir=args.data_dir,
@@ -98,7 +114,7 @@ def cli_main():
             num_workers=args.num_workers,
             n_local_crops=args.n_local_crops,  # for only SwAV
         )
-
+        
     # Model selection with method-specific parameters
     common_params = {
         "base_encoder": args.base_encoder,  # mae は使わないので渡さないように注意
@@ -123,11 +139,8 @@ def cli_main():
         )
     elif args.method == "mae":
         # MAE has its own LR and WD recommendations
-        args.base_encoder = "vit"  # base_encoder は ViT 固定
         mae_params = common_params.copy()
-        mae_params.pop(
-            "base_encoder"
-        )  # base_encoder は ViT 固定なので渡さない(渡すと怒られる)
+        mae_params.pop("base_encoder")  # base_encoder は ViT 固定なので渡さない
         if args.dataset == "cifar10":
             mae_params["lr"] = 1.5e-3  # CIFAR-10用により高い学習率
             mae_params["weight_decay"] = 0.05
@@ -141,34 +154,86 @@ def cli_main():
         mae_params["mask_ratio"] = args.mask_ratio
         model = MAEModule(**mae_params)
 
+    # Create checkpoint directory
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    run_name = f"{args.method}_{args.base_encoder}_{args.dataset}_{timestamp}"
+    checkpoint_dir = os.path.join(args.checkpoint_dir, run_name)
+    os.makedirs(checkpoint_dir, exist_ok=True)
+
+    # Callbacks
+    callbacks = []
+    
+    # 1. Best model checkpoint (based on loss)
+    best_checkpoint_callback = ModelCheckpoint(
+        dirpath=checkpoint_dir,
+        filename="best-{epoch:03d}-{train_loss:.4f}",
+        monitor="train_loss",
+        mode="min",
+        save_top_k=args.save_top_k,
+        save_last=True,  # 最後のエポックも保存
+        verbose=True,
+    )
+    callbacks.append(best_checkpoint_callback)
+    
+    # 2. Regular interval checkpoint
+    periodic_checkpoint_callback = ModelCheckpoint(
+        dirpath=checkpoint_dir,
+        filename="periodic-{epoch:03d}",
+        every_n_epochs=args.save_every_n_epochs,
+        save_top_k=-1,  # すべて保存
+        verbose=True,
+    )
+    callbacks.append(periodic_checkpoint_callback)
+    
+    # 3. Learning rate monitor
+    lr_monitor = LearningRateMonitor(logging_interval='epoch')
+    callbacks.append(lr_monitor)
+
     # Logger
     wandb_logger = WandbLogger(
-        project=args.project_name,
-        name=f"{args.method}_{args.base_encoder}_{args.dataset}",
+        project=args.project_name, 
+        name=run_name,
+        save_dir=checkpoint_dir,
     )
-
+    
+    # Log hyperparameters
+    wandb_logger.log_hyperparams(vars(args))
+    
     # Trainer
     trainer = pl.Trainer(
         logger=wandb_logger,
+        callbacks=callbacks,
         accelerator="auto",
         devices="auto",
         precision=args.precision,
         max_epochs=args.max_epochs,
         gradient_clip_val=1.0,  # Gradient clipping for stability
         log_every_n_steps=50,
-        check_val_every_n_epoch=10,
-        callbacks=[
-            pl.callbacks.LearningRateMonitor(logging_interval="epoch"),
-            pl.callbacks.ModelCheckpoint(
-                save_top_k=3,
-                monitor="train_loss",
-                mode="min",
-            ),
-        ],  # Validation can be added later
+        check_val_every_n_epoch=10,  # Validation can be added later
+        default_root_dir=checkpoint_dir,  # ログとチェックポイントの保存先
+        enable_checkpointing=True,
+        resume_from_checkpoint=args.resume_from_checkpoint,  # 学習の再開
     )
 
     # Train
     trainer.fit(model, dm)
+    
+    # Save final model info
+    print(f"\nTraining completed!")
+    print(f"Checkpoints saved in: {checkpoint_dir}")
+    print(f"Best checkpoint: {best_checkpoint_callback.best_model_path}")
+    print(f"Last checkpoint: {best_checkpoint_callback.last_model_path}")
+    
+    # Save path information for easy access
+    with open(os.path.join(checkpoint_dir, "checkpoint_info.txt"), "w") as f:
+        f.write(f"Run name: {run_name}\n")
+        f.write(f"Method: {args.method}\n")
+        f.write(f"Dataset: {args.dataset}\n")
+        f.write(f"Base encoder: {args.base_encoder}\n")
+        f.write(f"Epochs: {args.max_epochs}\n")
+        f.write(f"Best checkpoint: {best_checkpoint_callback.best_model_path}\n")
+        f.write(f"Last checkpoint: {best_checkpoint_callback.last_model_path}\n")
+        f.write(f"Train loss at best: {best_checkpoint_callback.best_model_score}\n")
 
 
 if __name__ == "__main__":

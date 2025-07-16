@@ -1,6 +1,7 @@
 #
 data_dir/
 wandb/
+checkpoints/
 #
 *.svg
 *.pdf
