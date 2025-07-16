@@ -167,7 +167,16 @@ class ImageNetDataModule(pl.LightningDataModule):
         else:  # Default for SimCLR, BYOL, etc.
             transform = SSLTransform(self.input_size)
         self.dataset = ImageFolder(self.data_dir, transform=transform)
-
+    
+    def train_dataloader(self): # [TODO] チェック要件
+        return DataLoader(
+            self.dataset,
+            batch_size=self.batch_size,
+            shuffle=True,
+            num_workers=self.num_workers,
+            pin_memory=True,
+            drop_last=True,
+        )
 
 class CIFAR10DataModule(pl.LightningDataModule):
     def __init__(

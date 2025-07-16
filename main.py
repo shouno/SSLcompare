@@ -12,6 +12,43 @@ from pytorch_lightning.callbacks import ModelCheckpoint, LearningRateMonitor
 import os
 from datetime import datetime
 
+def check_checkpoints(checkpoint_dir):
+    """チェックポイントディレクトリの内容を確認"""
+    import os
+    import torch
+    
+    print(f"\n=== Checkpoint Directory Contents ===")
+    print(f"Directory: {checkpoint_dir}")
+    
+    if not os.path.exists(checkpoint_dir):
+        print("❌ Checkpoint directory does not exist!")
+        return
+    
+    files = os.listdir(checkpoint_dir)
+    ckpt_files = [f for f in files if f.endswith('.ckpt')]
+    
+    print(f"Total files: {len(files)}")
+    print(f"Checkpoint files: {len(ckpt_files)}")
+    
+    for f in ckpt_files:
+        filepath = os.path.join(checkpoint_dir, f)
+        try:
+            # チェックポイントファイルの内容を確認
+            checkpoint = torch.load(filepath, map_location='cpu')
+            print(f"\n✅ {f}:")
+            print(f"  - File size: {os.path.getsize(filepath) / 1024 / 1024:.2f} MB")
+            print(f"  - Keys: {list(checkpoint.keys())}")
+            if 'state_dict' in checkpoint:
+                print(f"  - Model parameters: {len(checkpoint['state_dict'])} keys")
+                # 最初の数個のパラメータ名を表示
+                param_names = list(checkpoint['state_dict'].keys())[:5]
+                print(f"  - Sample params: {param_names}")
+            if 'epoch' in checkpoint:
+                print(f"  - Epoch: {checkpoint['epoch']}")
+        except Exception as e:
+            print(f"❌ {f}: Error loading - {e}")
+    
+    return ckpt_files
 
 def cli_main():
     parser = argparse.ArgumentParser(description="SSL Benchmark Trainer")
@@ -162,8 +199,29 @@ def cli_main():
 
     # Callbacks
     callbacks = []
-    
-    # 1. Best model checkpoint (based on loss)
+
+    # 1. 毎エポック保存（確実に保存される）
+    #every_epoch_checkpoint = ModelCheckpoint(
+    #    dirpath=checkpoint_dir,
+    #    filename="epoch-{epoch:03d}",
+    #    every_n_epochs=1,  # 毎エポック保存
+    #    save_top_k=-1,     # 全て保存
+    #    verbose=True,
+    #)
+    #callbacks.append(every_epoch_checkpoint)
+
+    # 2. Regular interval checkpoint
+    periodic_checkpoint_callback = ModelCheckpoint(
+        dirpath=checkpoint_dir,
+        filename="periodic-{epoch:03d}",
+        # every_n_epochs=args.save_every_n_epochs,
+        every_n_epochs=1,
+        save_top_k=-1,  # すべて保存
+        verbose=True,
+    )
+    callbacks.append(periodic_checkpoint_callback)
+
+    # 1. Best & Last model checkpoint (based on loss)
     best_checkpoint_callback = ModelCheckpoint(
         dirpath=checkpoint_dir,
         filename="best-{epoch:03d}-{train_loss:.4f}",
@@ -174,16 +232,6 @@ def cli_main():
         verbose=True,
     )
     callbacks.append(best_checkpoint_callback)
-    
-    # 2. Regular interval checkpoint
-    periodic_checkpoint_callback = ModelCheckpoint(
-        dirpath=checkpoint_dir,
-        filename="periodic-{epoch:03d}",
-        every_n_epochs=args.save_every_n_epochs,
-        save_top_k=-1,  # すべて保存
-        verbose=True,
-    )
-    callbacks.append(periodic_checkpoint_callback)
     
     # 3. Learning rate monitor
     lr_monitor = LearningRateMonitor(logging_interval='epoch')
@@ -234,6 +282,25 @@ def cli_main():
         f.write(f"Last checkpoint: {best_checkpoint_callback.last_model_path}\n")
         f.write(f"Train loss at best: {best_checkpoint_callback.best_model_score}\n")
 
+    # for Debug
+    # trainer.fit()の後に追加
+    print(f"\nTraining completed!")
+    saved_checkpoints = check_checkpoints(checkpoint_dir)
+
+    if saved_checkpoints:
+        print(f"✅ Successfully saved {len(saved_checkpoints)} checkpoints")
+    else:
+        print("❌ No checkpoints were saved!")
+        print("Possible causes:")
+        print("1. Training didn't complete properly")
+        print("2. Checkpoint callback configuration issue")
+        print("3. Disk space or permission issues")
+        print("4. PyTorch Lightning version compatibility")
+
+
+
 
 if __name__ == "__main__":
     cli_main()
+
+
