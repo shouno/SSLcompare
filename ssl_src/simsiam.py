@@ -32,7 +32,8 @@ class SimSiamModule(BaseSSLModule):
 
         # Log metrics with explicit sync_dist for multi-GPU
         self.log("train_loss", loss, on_step=True, on_epoch=True, prog_bar=True, sync_dist=True)
-        self.log("lr", self.trainer.optimizers[0].param_groups[0]['lr'], on_epoch=True, prog_bar=True, sync_dist=True)
+        lr = self.trainer.optimizers[0].param_groups[0]['lr']
+        self.log("lr", torch.tensor(lr, device=self.device), on_epoch=True, prog_bar=True, sync_dist=True)
     
         # 追加のメトリクス
         self.log("cosine_sim_p1_z2", F.cosine_similarity(p1, z2.detach(), dim=1).mean(), on_epoch=True, sync_dist=True)
