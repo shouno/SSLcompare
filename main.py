@@ -200,17 +200,7 @@ def cli_main():
     # Callbacks
     callbacks = []
 
-    # 1. 毎エポック保存（確実に保存される）
-    #every_epoch_checkpoint = ModelCheckpoint(
-    #    dirpath=checkpoint_dir,
-    #    filename="epoch-{epoch:03d}",
-    #    every_n_epochs=1,  # 毎エポック保存
-    #    save_top_k=-1,     # 全て保存
-    #    verbose=True,
-    #)
-    #callbacks.append(every_epoch_checkpoint)
-
-    # 2. Regular interval checkpoint
+    # 1. 定期的な保存
     periodic_checkpoint_callback = ModelCheckpoint(
         dirpath=checkpoint_dir,
         filename="periodic-{epoch:03d}",
@@ -218,6 +208,7 @@ def cli_main():
         every_n_epochs=1,
         save_top_k=-1,  # すべて保存
         verbose=True,
+        auto_insert_metric_name=False,
     )
     callbacks.append(periodic_checkpoint_callback)
 
@@ -230,6 +221,7 @@ def cli_main():
         save_top_k=args.save_top_k,
         save_last=True,  # 最後のエポックも保存
         verbose=True,
+        auto_insert_metric_name=False,
     )
     callbacks.append(best_checkpoint_callback)
     
@@ -260,27 +252,29 @@ def cli_main():
         check_val_every_n_epoch=10,  # Validation can be added later
         default_root_dir=checkpoint_dir,  # ログとチェックポイントの保存先
         enable_checkpointing=True,
+        sync_batchnorm=True, #BatchNorm の同期
     )
 
     # Train
     trainer.fit(model, dm, ckpt_path=args.resume_from_checkpoint)  # 学習の再開
     
     # Save final model info
-    print(f"\nTraining completed!")
-    print(f"Checkpoints saved in: {checkpoint_dir}")
-    print(f"Best checkpoint: {best_checkpoint_callback.best_model_path}")
-    print(f"Last checkpoint: {best_checkpoint_callback.last_model_path}")
+    if trainer.global_rank == 0:
+        print(f"\nTraining completed!")
+        print(f"Checkpoints saved in: {checkpoint_dir}")
+        print(f"Best checkpoint: {best_checkpoint_callback.best_model_path}")
+        print(f"Last checkpoint: {best_checkpoint_callback.last_model_path}")
     
-    # Save path information for easy access
-    with open(os.path.join(checkpoint_dir, "checkpoint_info.txt"), "w") as f:
-        f.write(f"Run name: {run_name}\n")
-        f.write(f"Method: {args.method}\n")
-        f.write(f"Dataset: {args.dataset}\n")
-        f.write(f"Base encoder: {args.base_encoder}\n")
-        f.write(f"Epochs: {args.max_epochs}\n")
-        f.write(f"Best checkpoint: {best_checkpoint_callback.best_model_path}\n")
-        f.write(f"Last checkpoint: {best_checkpoint_callback.last_model_path}\n")
-        f.write(f"Train loss at best: {best_checkpoint_callback.best_model_score}\n")
+        # Save path information for easy access
+        with open(os.path.join(checkpoint_dir, "checkpoint_info.txt"), "w") as f:
+            f.write(f"Run name: {run_name}\n")
+            f.write(f"Method: {args.method}\n")
+            f.write(f"Dataset: {args.dataset}\n")
+            f.write(f"Base encoder: {args.base_encoder}\n")
+            f.write(f"Epochs: {args.max_epochs}\n")
+            f.write(f"Best checkpoint: {best_checkpoint_callback.best_model_path}\n")
+            f.write(f"Last checkpoint: {best_checkpoint_callback.last_model_path}\n")
+            f.write(f"Train loss at best: {best_checkpoint_callback.best_model_score}\n")
 
     # for Debug
     # trainer.fit()の後に追加
