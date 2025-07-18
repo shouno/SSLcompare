@@ -207,8 +207,9 @@ def cli_main():
         # every_n_epochs=args.save_every_n_epochs,
         every_n_epochs=1,
         save_top_k=-1,  # すべて保存
+        monitor=None,   # pytorch-lighting 2.系で変更らしい
         verbose=True,
-        auto_insert_metric_name=False,
+        # auto_insert_metric_name=False,
     )
     callbacks.append(periodic_checkpoint_callback)
 
@@ -221,7 +222,7 @@ def cli_main():
         save_top_k=args.save_top_k,
         save_last=True,  # 最後のエポックも保存
         verbose=True,
-        auto_insert_metric_name=False,
+        # auto_insert_metric_name=False,
     )
     callbacks.append(best_checkpoint_callback)
     
