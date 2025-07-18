@@ -9,8 +9,207 @@ from ssl_src.swav import SwAVModule
 from ssl_src.mae import MAEModule
 from pytorch_lightning.loggers import WandbLogger
 from pytorch_lightning.callbacks import ModelCheckpoint, LearningRateMonitor
+import torch
 import os
 from datetime import datetime
+
+
+# 詳細なチェックポイント調査コード
+class VerboseModelCheckpoint(ModelCheckpoint):
+    """非常に詳細なデバッグ情報を出力するModelCheckpoint（修正版）"""
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        print(f"\n🔧 VerboseModelCheckpoint初期化:")
+        print(f"  - dirpath: {self.dirpath}")
+        print(f"  - filename: {self.filename}")
+        print(f"  - monitor: {self.monitor}")
+        print(f"  - mode: {self.mode}")
+        print(f"  - save_top_k: {self.save_top_k}")
+        print(f"  - every_n_epochs: {getattr(self, 'every_n_epochs', None)}")
+        print(f"  - save_last: {self.save_last}")
+        print(f"  - verbose: {self.verbose}")
+        
+        # ディレクトリの詳細確認
+        if self.dirpath:
+            print(f"  - Directory exists: {os.path.exists(self.dirpath)}")
+            if os.path.exists(self.dirpath):
+                print(f"  - Directory writable: {os.access(self.dirpath, os.W_OK)}")
+                print(f"  - Directory permissions: {oct(os.stat(self.dirpath).st_mode)[-3:]}")
+    
+    def on_train_epoch_end(self, trainer, pl_module):
+        """エポック終了時の詳細調査（修正版）"""
+        print(f"\n📊 エポック {trainer.current_epoch} 終了時の詳細調査:")
+        
+        # 1. ログされたメトリクスの確認
+        print("  メトリクス情報:")
+        logged_metrics = trainer.logged_metrics
+        callback_metrics = trainer.callback_metrics
+        
+        print(f"    - logged_metrics keys: {list(logged_metrics.keys())}")
+        print(f"    - callback_metrics keys: {list(callback_metrics.keys())}")
+        
+        if self.monitor:
+            monitor_val_logged = logged_metrics.get(self.monitor)
+            monitor_val_callback = callback_metrics.get(self.monitor)
+            print(f"    - monitor '{self.monitor}' in logged_metrics: {monitor_val_logged}")
+            print(f"    - monitor '{self.monitor}' in callback_metrics: {monitor_val_callback}")
+            
+            # 詳細な型情報
+            if monitor_val_callback is not None:
+                print(f"    - monitor value type: {type(monitor_val_callback)}")
+                if isinstance(monitor_val_callback, torch.Tensor):
+                    print(f"    - monitor value device: {monitor_val_callback.device}")
+                    print(f"    - monitor value shape: {monitor_val_callback.shape}")
+        
+        # 2. 保存条件の詳細チェック
+        print("  保存条件チェック:")
+        
+        # every_n_epochs チェック
+        if hasattr(self, 'every_n_epochs') and self.every_n_epochs:
+            should_save_periodic = (trainer.current_epoch + 1) % self.every_n_epochs == 0
+            print(f"    - 定期保存条件 (every {self.every_n_epochs} epochs): {should_save_periodic}")
+        
+        # monitor チェック（修正版）
+        if self.monitor and self.monitor in callback_metrics:
+            current_score = callback_metrics[self.monitor]
+            print(f"    - 現在のスコア: {current_score}")
+            print(f"    - 過去のベストスコア: {self.best_model_score}")
+            print(f"    - ベストスコアの型: {type(self.best_model_score)}")
+            
+            # None チェックを追加
+            if self.best_model_score is not None:
+                # テンソルの場合は.item()で値を取得
+                if isinstance(current_score, torch.Tensor):
+                    current_val = current_score.item()
+                else:
+                    current_val = current_score
+                
+                if isinstance(self.best_model_score, torch.Tensor):
+                    best_val = self.best_model_score.item()
+                else:
+                    best_val = self.best_model_score
+                
+                if self.mode == "min":
+                    is_better = current_val < best_val
+                else:
+                    is_better = current_val > best_val
+                print(f"    - スコア改善: {is_better}")
+            else:
+                print(f"    - 初回エポック（ベストスコア未設定）")
+        
+        # save_last チェック
+        is_last_epoch = trainer.current_epoch == trainer.max_epochs - 1
+        print(f"    - 最終エポック: {is_last_epoch}")
+        print(f"    - save_last設定: {self.save_last}")
+        
+        # 3. 実際の親クラスの処理を実行
+        print("  親クラスの処理実行中...")
+        try:
+            result = super().on_train_epoch_end(trainer, pl_module)
+            print("  ✅ 親クラスの処理完了")
+        except Exception as e:
+            print(f"  ❌ 親クラスの処理でエラー: {e}")
+            import traceback
+            traceback.print_exc()
+            return
+        
+        # 4. 処理後の状態確認
+        print("  処理後の状態:")
+        print(f"    - best_model_path: {self.best_model_path}")
+        print(f"    - last_model_path: {self.last_model_path}")
+        print(f"    - best_model_score: {self.best_model_score}")
+        
+        # 5. 実際にファイルが作成されているかチェック
+        if self.dirpath and os.path.exists(self.dirpath):
+            files = os.listdir(self.dirpath)
+            ckpt_files = [f for f in files if f.endswith('.ckpt')]
+            print(f"    - ディレクトリ内のファイル数: {len(files)}")
+            print(f"    - .ckptファイル数: {len(ckpt_files)}")
+            if ckpt_files:
+                print(f"    - .ckptファイル: {ckpt_files}")
+                # 最新ファイルのサイズも確認
+                for ckpt in ckpt_files:
+                    filepath = os.path.join(self.dirpath, ckpt)
+                    size_mb = os.path.getsize(filepath) / (1024 * 1024)
+                    print(f"      - {ckpt}: {size_mb:.2f} MB")
+        
+        return result
+    
+    def _save_checkpoint(self, trainer, filepath):
+        """実際のファイル保存処理の詳細調査（修正版）"""
+        print(f"\n💾 チェックポイント保存試行:")
+        print(f"  - ファイルパス: {filepath}")
+        print(f"  - ディレクトリ存在: {os.path.exists(os.path.dirname(filepath))}")
+        
+        if os.path.exists(os.path.dirname(filepath)):
+            print(f"  - ディレクトリ書き込み可能: {os.access(os.path.dirname(filepath), os.W_OK)}")
+        
+        # ディスク容量チェック
+        try:
+            import shutil
+            disk_usage = shutil.disk_usage(os.path.dirname(filepath))
+            free_gb = disk_usage.free / (1024**3)
+            print(f"  - 空きディスク容量: {free_gb:.2f} GB")
+        except Exception as e:
+            print(f"  - ディスク容量チェックエラー: {e}")
+        
+        # 一時ファイルでの書き込みテスト
+        temp_file = os.path.join(os.path.dirname(filepath), "write_test.tmp")
+        try:
+            with open(temp_file, 'w') as f:
+                f.write("test")
+            if os.path.exists(temp_file):
+                os.remove(temp_file)
+            print(f"  - 書き込みテスト: ✅ 成功")
+        except Exception as e:
+            print(f"  - 書き込みテスト: ❌ 失敗 - {e}")
+            return
+        
+        # モデル情報
+        try:
+            state_dict = trainer.lightning_module.state_dict()
+            print(f"  - モデル状態辞書のキー数: {len(state_dict)}")
+            print(f"  - オプティマイザ数: {len(trainer.optimizers)}")
+            
+            # メモリ使用量の概算
+            total_params = sum(p.numel() for p in state_dict.values() if isinstance(p, torch.Tensor))
+            print(f"  - 総パラメータ数: {total_params:,}")
+        except Exception as e:
+            print(f"  - モデル情報取得エラー: {e}")
+        
+        # 実際の保存処理
+        try:
+            print(f"  - 保存処理開始...")
+            result = super()._save_checkpoint(trainer, filepath)
+            print(f"  - 保存処理完了")
+            
+            # 保存後の確認
+            if os.path.exists(filepath):
+                file_size_mb = os.path.getsize(filepath) / (1024 * 1024)
+                print(f"  - ✅ 保存成功! ファイルサイズ: {file_size_mb:.2f} MB")
+                
+                # チェックポイントファイルの内容確認
+                try:
+                    checkpoint = torch.load(filepath, map_location='cpu')
+                    print(f"  - チェックポイント内容: {list(checkpoint.keys())}")
+                    if 'state_dict' in checkpoint:
+                        print(f"  - state_dict キー数: {len(checkpoint['state_dict'])}")
+                    if 'epoch' in checkpoint:
+                        print(f"  - エポック: {checkpoint['epoch']}")
+                except Exception as e:
+                    print(f"  - チェックポイント読み込み確認エラー: {e}")
+            else:
+                print(f"  - ❌ ファイルが作成されていません")
+            
+            return result
+            
+        except Exception as e:
+            print(f"  - ❌ 保存エラー: {e}")
+            import traceback
+            traceback.print_exc()
+            # エラーでも処理を続行
+            return None
 
 def check_checkpoints(checkpoint_dir):
     """チェックポイントディレクトリの内容を確認"""
@@ -201,30 +400,31 @@ def cli_main():
     callbacks = []
 
     # 1. 定期的な保存
-    periodic_checkpoint_callback = ModelCheckpoint(
+    #checkpoint_callback = ModelCheckpoint(
+    checkpoint_callback = VerboseModelCheckpoint(
         dirpath=checkpoint_dir,
-        filename="periodic-{epoch:03d}",
+        filename="{epoch:03d}-{train_loss:.4f}",
+        monitor="train_loss",  # 明示しておく
+        mode="min",
         # every_n_epochs=args.save_every_n_epochs,
         every_n_epochs=1,
-        save_top_k=-1,  # すべて保存
-        monitor=None,   # pytorch-lighting 2.系で変更らしい
+        save_top_k=args.save_top_k,   # とりあえず１個
+        save_last=True,               # 最後の１個も保存
         verbose=True,
-        # auto_insert_metric_name=False,
     )
-    callbacks.append(periodic_checkpoint_callback)
+    callbacks.append(checkpoint_callback)
 
-    # 1. Best & Last model checkpoint (based on loss)
-    best_checkpoint_callback = ModelCheckpoint(
-        dirpath=checkpoint_dir,
-        filename="best-{epoch:03d}-{train_loss:.4f}",
-        monitor="train_loss",
-        mode="min",
-        save_top_k=args.save_top_k,
-        save_last=True,  # 最後のエポックも保存
-        verbose=True,
-        # auto_insert_metric_name=False,
-    )
-    callbacks.append(best_checkpoint_callback)
+    ## 1. Best & Last model checkpoint (based on loss)
+    #best_checkpoint_callback = ModelCheckpoint(
+    #    dirpath=checkpoint_dir,
+    #    filename="best-{epoch:03d}-{train_loss:.4f}",
+    #    monitor="train_loss",
+    #    mode="min",
+    #    save_top_k=args.save_top_k,
+    #    save_last=True,  # 最後のエポックも保存
+    #    verbose=True,
+    #)
+    #callbacks.append(best_checkpoint_callback)
     
     # 3. Learning rate monitor
     lr_monitor = LearningRateMonitor(logging_interval='epoch')
@@ -253,7 +453,6 @@ def cli_main():
         check_val_every_n_epoch=10,  # Validation can be added later
         default_root_dir=checkpoint_dir,  # ログとチェックポイントの保存先
         enable_checkpointing=True,
-        sync_batchnorm=True, #BatchNorm の同期
     )
 
     # Train
@@ -263,8 +462,6 @@ def cli_main():
     if trainer.global_rank == 0:
         print(f"\nTraining completed!")
         print(f"Checkpoints saved in: {checkpoint_dir}")
-        print(f"Best checkpoint: {best_checkpoint_callback.best_model_path}")
-        print(f"Last checkpoint: {best_checkpoint_callback.last_model_path}")
     
         # Save path information for easy access
         with open(os.path.join(checkpoint_dir, "checkpoint_info.txt"), "w") as f:
@@ -273,9 +470,6 @@ def cli_main():
             f.write(f"Dataset: {args.dataset}\n")
             f.write(f"Base encoder: {args.base_encoder}\n")
             f.write(f"Epochs: {args.max_epochs}\n")
-            f.write(f"Best checkpoint: {best_checkpoint_callback.best_model_path}\n")
-            f.write(f"Last checkpoint: {best_checkpoint_callback.last_model_path}\n")
-            f.write(f"Train loss at best: {best_checkpoint_callback.best_model_score}\n")
 
     # for Debug
     # trainer.fit()の後に追加
