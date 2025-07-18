@@ -330,7 +330,8 @@ def cli_main():
     callbacks = []
     
     # 1. 最もシンプルな保存（無条件、毎エポック）
-    simple_callback = VerboseModelCheckpoint(
+    #simple_callback = VerboseModelCheckpoint(
+    simple_callback = ModelCheckpoint(
         dirpath=checkpoint_dir,
         filename="simple-{epoch:03d}",
         every_n_epochs=1,
@@ -342,16 +343,16 @@ def cli_main():
     callbacks.append(simple_callback)
     
     # 2. train_lossモニタリング付き
-    monitored_callback = VerboseModelCheckpoint(
-        dirpath=checkpoint_dir,
-        filename="monitored-{epoch:03d}",
-        monitor="train_loss",
-        mode="min",
-        save_top_k=3,
-        save_last=True,
-        verbose=True,
-    )
-    callbacks.append(monitored_callback)
+    #monitored_callback = VerboseModelCheckpoint(
+    #    dirpath=checkpoint_dir,
+    #    filename="monitored-{epoch:03d}",
+    #    monitor="train_loss",
+    #    mode="min",
+    #    save_top_k=3,
+    #    save_last=True,
+    #    verbose=True,
+    #)
+    #callbacks.append(monitored_callback)
     
     # 3. 学習率モニター
     lr_monitor = LearningRateMonitor(logging_interval='epoch')
