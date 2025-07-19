@@ -38,12 +38,6 @@ class SimCLRModule(BaseSSLModule):
             [torch.arange(batch_size) + batch_size, torch.arange(batch_size)], dim=0
         ).to(self.device)
 
-        ## Mask to remove diagonal elements (self-similarity)
-        #mask = torch.eye(labels.shape[0], dtype=bool).to(self.device)
-        #similarity_matrix = similarity_matrix[~mask].view(
-        #    similarity_matrix.shape[0], -1
-        #)
-
         # Apply temperature
         similarity_matrix = similarity_matrix / self.temperature
 

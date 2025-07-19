@@ -32,8 +32,11 @@ class BarlowTwinsModule(BaseSSLModule):
         on_diag = torch.diagonal(c).add_(-1).pow_(2).sum()
 
         # Off-diagonal terms (should be 0)
-        off_diag = (c.flatten()[1:].view(c.size(0) - 1,
-                    c.size(0) + 1)[:, :-1].flatten()).pow_(2).sum()
+        off_diag = (
+            (c.flatten()[1:].view(c.size(0) - 1, c.size(0) + 1)[:, :-1].flatten())
+            .pow_(2)
+            .sum()
+        )
 
         loss = on_diag + self.lambd * off_diag
 
@@ -42,6 +45,6 @@ class BarlowTwinsModule(BaseSSLModule):
         self.log("on_diag_loss", on_diag)
         self.log("off_diag_loss", off_diag)
         self.log("lambda", self.lambd)
-        self.log("lr", self.trainer.optimizers[0].param_groups[0]['lr'])
+        self.log("lr", self.trainer.optimizers[0].param_groups[0]["lr"])
 
         return loss

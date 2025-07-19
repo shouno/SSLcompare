@@ -31,29 +31,11 @@ class SimSiamModule(BaseSSLModule):
         loss = (self._loss(p1, z2) + self._loss(p2, z1)) / 2
 
         # Log metrics with explicit sync_dist for multi-GPU
-        self.log("train_loss", loss,
-            on_step=True, 
-            on_epoch=True, 
-            prog_bar=True, 
-            sync_dist=True,
-            rank_zero_only=False)
-        
-        if self.trainer.optimizers:
-            lr = self.trainer.optimizers[0].param_groups[0]['lr']
-            self.log("lr", torch.tensor(lr, device=self.device),
-            on_epoch=True, 
-            prog_bar=True, 
-            sync_dist=True,
-            rank_zero_only=False)
-    
+        self.log("train_loss", loss)
+        self.log("lr", self.trainer.optimizers[0].param_groups[0]["lr"])
+
         # 追加のメトリクス
-        self.log("cosine_sim_p1_z2", 
-                F.cosine_similarity(p1, z2.detach(), dim=1).mean(), on_epoch=True, 
-                sync_dist=True,
-                rank_zero_only=False)
-        self.log("cosine_sim_p2_z1", 
-                F.cosine_similarity(p2, z1.detach(), dim=1).mean(), on_epoch=True,
-                sync_dist=True,
-                rank_zero_only=False)
-        
+        self.log("cosine_sim_p1_z2", F.cosine_similarity(p1, z2.detach(), dim=1).mean())
+        self.log("cosine_sim_p2_z1", F.cosine_similarity(p2, z1.detach(), dim=1).mean())
+
         return loss
