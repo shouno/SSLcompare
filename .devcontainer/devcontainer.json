@@ -35,7 +35,12 @@
 			// コンテナ内のVSCodeの設定
 			"settings": {
 				"terminal.integrated.defaultProfile.linux": "bash",
-				"python.defaultInterpreterPath": "/usr/bin/python3"
+				"python.defaultInterpreterPath": "/usr/bin/python3",
+				"python.analysis.autoImportCompletions": true,
+				"python.analysis.extraPaths": [
+					"${containerWorkspaceFolder}",
+					"./ssl_src"
+				]
 			}
 		}
 	},
@@ -43,5 +48,8 @@
 	"workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind,consistency=cached",
 	"workspaceFolder": "/workspace",
 	// 5. コンテナに接続するユーザー
-	"remoteUser": "${localEnv:USER}"
+	"remoteUser": "${localEnv:USER}",
+	"remoteEnv": {
+		"PYTHONPATH": "${containerWorkspaceFolder}/ssl_src:${PYTHONPATH}"
+	}
 }
