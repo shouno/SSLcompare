@@ -248,10 +248,8 @@ class MAEModule(BaseSSLModule):
             betas=(0.9, 0.95),
         )
         # Cosine scheduler with warmup
-        warmup_steps = self.hparams.get("warmup_epochs", 10)
-        sched = torch.optim.lr_scheduler.CosineAnnealingLR(
-            opt, T_max=self.trainer.max_epochs - warmup_steps
-        )
+        t_max = max(1, self.trainer.max_epochs - int(self.hparams.get("warmup_epochs", 10)))
+        sched = torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=t_max)
 
         return {
             "optimizer": opt,

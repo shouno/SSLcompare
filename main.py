@@ -59,7 +59,7 @@ def cli_main():
         "--save_top_k", type=int, default=3, help="Number of best checkpoints to save"
     )
     parser.add_argument(
-        "--save_every_n_epochs", type=int, default=50, help="Save checkpoint every N epochs"
+        "--save_every_n_epochs", type=int, default=20, help="Save checkpoint every N epochs"
     )
     parser.add_argument(
         "--resume_from_checkpoint", type=str, default=None, help="Path to checkpoint to resume from"
@@ -165,9 +165,9 @@ def cli_main():
     checkpoint_callback = ModelCheckpoint(
         dirpath=checkpoint_dir,
         filename="periodic_{epoch:03d}",
+        save_top_k=-1,  # 全て保存
         monitor=None,  # 明示しておく
         every_n_epochs=args.save_every_n_epochs,
-        # every_n_epochs=5,
         # verbose=True,
     )
     callbacks.append(checkpoint_callback)
