@@ -59,7 +59,7 @@ def cli_main():
         "--save_top_k", type=int, default=3, help="Number of best checkpoints to save"
     )
     parser.add_argument(
-        "--save_every_n_epochs", type=int, default=20, help="Save checkpoint every N epochs"
+        "--save_every_n_epochs", type=int, default=10, help="Save checkpoint every N epochs"
     )
     parser.add_argument(
         "--resume_from_checkpoint", type=str, default=None, help="Path to checkpoint to resume from"
@@ -208,7 +208,7 @@ def cli_main():
         max_epochs=args.max_epochs,
         log_every_n_steps=50,
         default_root_dir=checkpoint_dir,  # ログとチェックポイントの保存先
-        enable_checkpointing=True,
+        enable_checkpointing=True, # 手動でコールバックにより管理 (上の ModelCheckpoint 参照)
         gradient_clip_val=1.0,  # Gradient clipping for stability
     )
 
