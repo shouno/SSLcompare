@@ -39,7 +39,7 @@
 				"python.analysis.autoImportCompletions": true,
 				"python.analysis.extraPaths": [
 					"${containerWorkspaceFolder}",
-					"./ssl_src"
+					"./sslcompare"
 				]
 			}
 		}
@@ -50,6 +50,6 @@
 	// 5. コンテナに接続するユーザー
 	"remoteUser": "${localEnv:USER}",
 	"remoteEnv": {
-		"PYTHONPATH": "${containerWorkspaceFolder}/ssl_src:${PYTHONPATH}"
+		"PYTHONPATH": "${containerWorkspaceFolder}/sslcompare:${PYTHONPATH}"
 	}
 }
