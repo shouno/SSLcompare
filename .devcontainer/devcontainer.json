@@ -38,8 +38,8 @@
 				"python.defaultInterpreterPath": "/usr/bin/python3",
 				"python.analysis.autoImportCompletions": true,
 				"python.analysis.extraPaths": [
-					"${containerWorkspaceFolder}",
-					"./sslcompare"
+					"${containerWorkspaceFolder}"
+					// "./sslcompare"
 				]
 			}
 		}
@@ -48,8 +48,8 @@
 	"workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind,consistency=cached",
 	"workspaceFolder": "/workspace",
 	// 5. コンテナに接続するユーザー
-	"remoteUser": "${localEnv:USER}",
-	"remoteEnv": {
-		"PYTHONPATH": "${containerWorkspaceFolder}/sslcompare:${PYTHONPATH}"
-	}
+	"remoteUser": "${localEnv:USER}"
+	//"remoteEnv": {
+	//	"PYTHONPATH": "${containerWorkspaceFolder}/sslcompare:${PYTHONPATH}"
+	//}
 }
