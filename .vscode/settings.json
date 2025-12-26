@@ -1,5 +1,13 @@
 {
     "cSpell.ignoreWords": [
-        "hparams"
+        "BYOL",
+        "barlowtwins",
+        "cifar",
+        "hparams",
+        "imagenet",
+        "simclr",
+        "simsiam",
+        "sslcompare",
+        "swav"
     ]
 }
