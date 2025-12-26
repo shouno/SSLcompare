@@ -208,7 +208,7 @@ def cli_main():
         max_epochs=args.max_epochs,
         log_every_n_steps=50,
         default_root_dir=checkpoint_dir,  # ログとチェックポイントの保存先
-        enable_checkpointing=True, # 手動でコールバックにより管理 (上の ModelCheckpoint 参照)
+        enable_checkpointing=True,
         gradient_clip_val=1.0,  # Gradient clipping for stability
     )
 
