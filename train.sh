@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # SimCLR/BYOL/SimSiam
-python3 main.py --method simclr  --dataset imagenet --data_dir /workspace/data/cifar10
+python3 main.py --method simclr  --dataset cifar10 --data_dir /workspace/data/cifar10
 #python3 main.py --method byol    --dataset cifar10 --data_dir /workspace/data/cifar10
 #python3 main.py --method simsiam --dataset cifar10 --data_dir /workspace/data/cifar10
 #python3 main.py --method barlow  --dataset cifar10 --data_dir /workspace/data/cifar10
