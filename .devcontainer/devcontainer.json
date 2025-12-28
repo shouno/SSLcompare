@@ -13,6 +13,8 @@
 			"USER_GID": "1000"
 		}
 	},
+	// pyproject.toml に dependencies 書いているので requirements.txt は不要？
+	"postCreateCommand": "pip install -e .",
 	// 2. GPUを有効にするための実行時引数 ★最重要★
 	// これにより、コンテナがホストマシンの全GPUにアクセスできるようになります。
 	"runArgs": [
