@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from .base import BaseSSLModule
-from .common import ProjectionMLP, PredictionMLP
+from .utils import ProjectionMLP, PredictionMLP
 import torchvision.models as models
 
 ###############################################
@@ -17,8 +17,7 @@ class BYOLModule(BaseSSLModule):
         self.prediction = PredictionMLP()
 
         # target encoder (EMA)
-        self.target_encoder = getattr(
-            models, self.hparams.base_encoder)(weights=None)
+        self.target_encoder = getattr(models, self.hparams.base_encoder)(weights=None)
         self.target_encoder.fc = nn.Identity()
         self.target_projection = ProjectionMLP(self.feat_dim)
         self.ema_decay = ema_decay
@@ -35,7 +34,9 @@ class BYOLModule(BaseSSLModule):
         """Initialize target networks with online network weights."""
         for p, q in zip(self.target_encoder.parameters(), self.encoder.parameters()):
             p.data.copy_(q.data)
-        for p, q in zip(self.target_projection.parameters(), self.projection.parameters()):
+        for p, q in zip(
+            self.target_projection.parameters(), self.projection.parameters()
+        ):
             p.data.copy_(q.data)
 
     @torch.no_grad()
@@ -43,7 +44,9 @@ class BYOLModule(BaseSSLModule):
         """Update target networks with exponential moving average."""
         for p, q in zip(self.target_encoder.parameters(), self.encoder.parameters()):
             p.data = p.data * self.ema_decay + q.data * (1 - self.ema_decay)
-        for p, q in zip(self.target_projection.parameters(), self.projection.parameters()):
+        for p, q in zip(
+            self.target_projection.parameters(), self.projection.parameters()
+        ):
             p.data = p.data * self.ema_decay + q.data * (1 - self.ema_decay)
 
     def training_step(self, batch, batch_idx):
@@ -59,13 +62,20 @@ class BYOLModule(BaseSSLModule):
             y2 = self.target_projection(self.target_encoder(x1))
 
         # Compute loss
-        loss = (2 - 2 * (F.cosine_similarity(q1, y1.detach(), dim=1).mean() +
-                         F.cosine_similarity(q2, y2.detach(), dim=1).mean()) / 2)
+        loss = (
+            2
+            - 2
+            * (
+                F.cosine_similarity(q1, y1.detach(), dim=1).mean()
+                + F.cosine_similarity(q2, y2.detach(), dim=1).mean()
+            )
+            / 2
+        )
 
         # Log metrics
         self.log("train_loss", loss)
         self.log("ema_decay", self.ema_decay)
-        self.log("lr", self.trainer.optimizers[0].param_groups[0]['lr'])
+        self.log("lr", self.trainer.optimizers[0].param_groups[0]["lr"])
 
         return loss
 

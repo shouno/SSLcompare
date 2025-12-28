@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from .base import BaseSSLModule
-from .common import ProjectionMLP, PredictionMLP
+from .utils import ProjectionMLP, PredictionMLP
 
 
 class PatchEmbed(nn.Module):
@@ -75,7 +75,7 @@ class MAEModule(BaseSSLModule):
         decoder_depth=8,
         decoder_num_heads=16,
         mask_ratio=0.75,
-        **kwargs
+        **kwargs,
     ):
         # CIFAR-10用の調整
         if img_size == 224 and patch_size == 4:  # CIFAR-10の場合
@@ -248,7 +248,9 @@ class MAEModule(BaseSSLModule):
             betas=(0.9, 0.95),
         )
         # Cosine scheduler with warmup
-        t_max = max(1, self.trainer.max_epochs - int(self.hparams.get("warmup_epochs", 10)))
+        t_max = max(
+            1, self.trainer.max_epochs - int(self.hparams.get("warmup_epochs", 10))
+        )
         sched = torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=t_max)
 
         return {

@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from .base import BaseSSLModule
-from .common import ProjectionMLP, PredictionMLP
+from .utils import ProjectionMLP, PredictionMLP
 
 ###############################################
 # 5. SimSiam

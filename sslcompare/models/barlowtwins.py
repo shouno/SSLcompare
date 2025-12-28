@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from .base import BaseSSLModule
-from .common import ProjectionMLP
+from .utils import ProjectionMLP
 
 ###############################################
 # 6. Barlow Twins

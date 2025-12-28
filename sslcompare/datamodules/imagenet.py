@@ -1,6 +1,6 @@
 from pathlib import Path
 from torchvision.datasets import ImageFolder
-from .base_data import BaseSSLDataModule
+from .base import BaseSSLDataModule
 
 
 # ImageNet 用の DataModule とりあえず，ガワだけ作ってる

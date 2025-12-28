@@ -1,5 +1,5 @@
 from torchvision.datasets import CIFAR10
-from .base_data import BaseSSLDataModule
+from .base import BaseSSLDataModule
 
 
 # CIFAR-10 用の DataModule

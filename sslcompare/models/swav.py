@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from typing import List
 from .base import BaseSSLModule
-from .common import ProjectionMLP, PredictionMLP
+from .utils import ProjectionMLP, PredictionMLP
 
 
 class SwAVModule(BaseSSLModule):
@@ -14,7 +14,7 @@ class SwAVModule(BaseSSLModule):
         n_local_crops: int = 6,
         sinkhorn_eps: float = 0.05,
         sinkhorn_iters: int = 3,
-        **kwargs
+        **kwargs,
     ):
         super().__init__(**kwargs)
         self.save_hyperparameters("n_prototypes", "temperature", "n_local_crops")
