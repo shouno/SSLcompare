@@ -1,7 +1,8 @@
 import torch
 import torch.nn as nn
 import torchvision.models as models
-import pytorch_lightning as pl
+import lightning.pytorch as pl
+
 
 ###############################################
 # Base SSL module with Lightning

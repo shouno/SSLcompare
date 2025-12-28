@@ -1,14 +1,10 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torch import Tensor
 
 from .base import BaseSSLModule
 from .utils import ProjectionMLP
-
-###############################################
-# 3. SimCLR
-###############################################
-
 
 class SimCLRModule(BaseSSLModule):
     def __init__(self, temperature: float = 0.2, **kwargs):
@@ -16,35 +12,31 @@ class SimCLRModule(BaseSSLModule):
         self.projection = ProjectionMLP(self.feat_dim)
         self.temperature = temperature
 
-    def nt_xent(self, z1: torch.Tensor, z2: torch.Tensor) -> torch.Tensor:
-        """NT-Xent loss computation."""
-        batch_size = z1.shape[0]
 
-        # Normalize embeddings
+    def nt_xent(self, z1: Tensor, z2: Tensor) -> Tensor:
+        """NT-Xent loss (SimCLR). Mask self-similarity on the diagonal."""
+        n = z1.shape[0]
+        device = z1.device
+
         z1 = F.normalize(z1, dim=1)
         z2 = F.normalize(z2, dim=1)
+        z = torch.cat([z1, z2], dim=0)  # (2N, D)
 
-        # Concatenate z1 and z2
-        representations = torch.cat([z1, z2], dim=0)
+        # cosine similarity via matmul (faster than pairwise cosine_similarity)
+        sim = (z @ z.T) / self.temperature  # (2N, 2N)
 
-        # Compute similarity matrix
-        similarity_matrix = F.cosine_similarity(
-            representations.unsqueeze(1), representations.unsqueeze(0), dim=2
-        )
+        # mask self-contrast (diagonal) to remove trivial matches
+        diag = torch.eye(2 * n, device=device, dtype=torch.bool)
+        # fp16 では -1e9 が overflow するので dtype に応じた最小値を使う
+        neg_inf = torch.finfo(sim.dtype).min
+        # ただし min は極端すぎて NaN の原因になる場合があるので、少し手前にしてもOK
+        sim = sim.masked_fill(diag, neg_inf)
 
-        # Create labels for positive pairs
-        # Positive pairs are (i, i+batch_size) and (i+batch_size, i)
-        labels = torch.cat(
-            [torch.arange(batch_size) + batch_size, torch.arange(batch_size)], dim=0
-        ).to(self.device)
+        # positives: (i -> i+N), (i+N -> i)
+        labels = torch.arange(2 * n, device=device)
+        labels = (labels + n) % (2 * n)
 
-        # Apply temperature
-        similarity_matrix = similarity_matrix / self.temperature
-
-        # Compute loss
-        loss = F.cross_entropy(similarity_matrix, labels)
-
-        return loss
+        return F.cross_entropy(sim, labels)
 
     def training_step(self, batch, batch_idx):
         (x1, x2), _ = batch

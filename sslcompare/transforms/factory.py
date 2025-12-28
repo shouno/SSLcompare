@@ -39,6 +39,10 @@ def build_transform(dataset: str, method: str, **kwargs) -> Callable:
         )
 
     if m in _MAE_METHODS:
-        return build_mae_single_view(spec, scale=kwargs.get("scale", (0.2, 1.0)))
+        return build_mae_single_view(
+            spec, 
+            img_size=kwargs.get("img_size", 224), # とりあえずImageNet準拠サイズになおす
+            scale=kwargs.get("scale", (0.2, 1.0))
+        )
 
     raise ValueError(f"Unknown method: {method}")

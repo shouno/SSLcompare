@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=61.0"]
+requires = ["setuptools>=64", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -20,12 +20,11 @@ dependencies = [
     "ipykernel",
     "joblib",
     "pandas",
+    "torchvision",
     "lightning",
     "wandb",
 ]
 
-[tool.setuptools]
-package-dir = { "" = "sslcompare" }
-
 [tool.setuptools.packages.find]
-where = ["sslcompare"]
+where = ["."]
+include = ["sslcompare*"]

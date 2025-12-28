@@ -85,17 +85,21 @@ def cli_main():
         dataset=args.dataset,
         method=args.method,
         n_local_crops=args.n_local_crops,
+        img_size=args.img_size,
         # 将来ここに jitter_strength 等を足しても train.py は変えない方針
     )
 
     # 2) datamodule
+    dm_kwargs = dict(
+        batch_size=args.batch_size,
+        num_workers=args.num_workers,
+        stl10_split=args.stl10_split,
+    )
     dm = build_datamodule(
         dataset=args.dataset,
         data_dir=args.data_dir,
         transform=transform,
-        batch_size=args.batch_size,
-        num_workers=args.num_workers,
-        stl10_split=args.stl10_split,
+        **dm_kwargs
     )
 
     # 3) model

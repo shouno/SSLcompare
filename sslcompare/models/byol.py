@@ -63,9 +63,7 @@ class BYOLModule(BaseSSLModule):
 
         # Compute loss
         loss = (
-            2
-            - 2
-            * (
+            2 - 2 * (
                 F.cosine_similarity(q1, y1.detach(), dim=1).mean()
                 + F.cosine_similarity(q2, y2.detach(), dim=1).mean()
             )
