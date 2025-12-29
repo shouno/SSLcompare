@@ -25,7 +25,18 @@ class BarlowTwinsModule(BaseSSLModule):
         z1 = (z1 - z1.mean(0)) / (z1.std(0) + 1e-8)
         z2 = (z2 - z2.mean(0)) / (z2.std(0) + 1e-8)
 
-        # Cross-correlation matrix
+        # For stability, transform fp32 from fp16
+        z1 = z1.float()
+        z2 = z2.float()
+
+        # Standardize per batch (more stable than +1e-8 in fp16)
+        eps = 1e-4
+        z1 = z1 - z1.mean(0)
+        z2 = z2 - z2.mean(0)
+        z1 = z1 / z1.std(0, unbiased=False).clamp_min(eps)
+        z2 = z2 / z2.std(0, unbiased=False).clamp_min(eps)
+
+        # Cross-correlation matrix (fp32)
         c = (z1.T @ z2) / z1.size(0)
 
         # Diagonal terms (should be 1)

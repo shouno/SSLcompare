@@ -35,7 +35,7 @@ def parse_args():
 
     # base model/optim
     p.add_argument("--base_encoder", default="resnet50")
-    p.add_argument("--lr", type=float, default=0.2)
+    p.add_argument("--lr", type=float, default=0.01) # 多分小規模データセットだと 0.2 は大きすぎる
     p.add_argument("--weight_decay", type=float, default=1e-6)
     p.add_argument("--warmup_epochs", type=int, default=10)
 
@@ -61,7 +61,7 @@ def parse_args():
 
     # ckpt
     p.add_argument("--checkpoint_root", default="checkpoints")
-    p.add_argument("--save_every_n_epochs", type=int, default=10)
+    p.add_argument("--save_every_n_epochs", type=int, default=20)
     p.add_argument("--save_top_k", type=int, default=3)
     p.add_argument("--resume_from_checkpoint", default=None)
 
