@@ -77,17 +77,6 @@ class MAEModule(BaseSSLModule):
         mask_ratio=0.75,
         **kwargs,
     ):
-        # CIFAR-10用の調整
-        if img_size == 224 and patch_size == 4:  # CIFAR-10の場合
-            img_size = 32
-            # より小さいモデルを使用
-            embed_dim = 384
-            encoder_depth = 6
-            num_heads = 6
-            decoder_embed_dim = 256
-            decoder_depth = 4
-            decoder_num_heads = 8
-
         # Override base_encoder as MAE uses a specific ViT architecture
         super().__init__(base_encoder="vit_mae", **kwargs)
         self.save_hyperparameters()
