@@ -14,5 +14,5 @@ python3 $TRAIN_PY --method barlowtwins  --dataset $DATASET --data_dir $DATAFOLDE
 # SwAV (メモリ使用量が多い)
 python3 $TRAIN_PY --method swav         --dataset $DATASET --data_dir $DATAFOLDER/$DATASET --max_epochs $MAXEPOCHS
 
-# MAE (メモリ使用量が多い)
-python3 $TRAIN_PY --method mae          --dataset $DATASET --data_dir $DATAFOLDER/$DATASET --lr 1e-4 --max_epochs $MAXEPOCHS --batch_size 256 
+# MAE (メモリ使用量が多い), エンコーダを ViT-MAE に固定, lr を低めに設定
+python3 $TRAIN_PY --method mae          --dataset $DATASET --data_dir $DATAFOLDER/$DATASET --lr 1e-4 --base_encoder vit_mae --max_epochs $MAXEPOCHS --batch_size 256 

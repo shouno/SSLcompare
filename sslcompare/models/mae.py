@@ -77,6 +77,9 @@ class MAEModule(BaseSSLModule):
         mask_ratio=0.75,
         **kwargs,
     ):
+
+        if base_encoder is not None and base_encoder != "vit_mae":
+            raise ValueError(f"MAEModule requires base_encoder='vit_mae'. Got: {base_encoder}")
         # Override base_encoder as MAE uses a specific ViT architecture
         super().__init__(base_encoder="vit_mae", **kwargs)
         self.save_hyperparameters()
@@ -214,6 +217,13 @@ class MAEModule(BaseSSLModule):
     def training_step(self, batch, batch_idx):
         # MAE uses a single image, not two views
         imgs, _ = batch
+        
+        B, C, H, W = imgs.shape
+        p = self.patch_embed.patch_size
+        assert H == self.hparams.img_size and W == self.hparams.img_size, \
+            f"Input size {H}x{W} != model img_size {self.hparams.img_size}. Check transforms."
+        assert H % p == 0 and W % p == 0, \
+            f"Input size {H}x{W} must be divisible by patch_size={p}."
 
         latent, mask, ids_restore = self.forward_encoder(imgs, self.hparams.mask_ratio)
         pred = self.forward_decoder(latent, ids_restore)
