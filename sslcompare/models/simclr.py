@@ -1,3 +1,4 @@
+from typing import Union, Tuple
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -13,8 +14,11 @@ class SimCLRModule(BaseSSLModule):
         self.temperature = temperature
 
 
-    def nt_xent(self, z1: Tensor, z2: Tensor) -> Tensor:
+    def nt_xent(
+        self, z1: Tensor, z2: Tensor, return_metrics: bool = False
+        ) -> Union[Tensor, Tuple[Tensor, Tensor, Tensor]]:
         """NT-Xent loss (SimCLR). Mask self-similarity on the diagonal."""
+
         n = z1.shape[0]
         device = z1.device
 
@@ -27,26 +31,49 @@ class SimCLRModule(BaseSSLModule):
 
         # mask self-contrast (diagonal) to remove trivial matches
         diag = torch.eye(2 * n, device=device, dtype=torch.bool)
-        # fp16 では -1e9 が overflow するので dtype に応じた最小値を使う
-        neg_inf = torch.finfo(sim.dtype).min
-        # ただし min は極端すぎて NaN の原因になる場合があるので、少し手前にしてもOK
-        sim = sim.masked_fill(diag, neg_inf)
+        mask_val = torch.tensor(-1e4, device=device, dtype=sim.dtype)
+        sim_masked = sim.masked_fill(diag, mask_val)
 
         # positives: (i -> i+N), (i+N -> i)
         labels = torch.arange(2 * n, device=device)
         labels = (labels + n) % (2 * n)
 
-        return F.cross_entropy(sim, labels)
+        loss = F.cross_entropy(sim_masked, labels)
+        if not return_metrics:
+            return loss
+        
+        # metrics 計算
+        with torch.no_grad():
+            # pos: i と i+N の類似度（cos/temperature）
+            pos = torch.cat([sim.diag(n), sim.diag(-n)], dim=0)  # (2N,)
+            pos_sim = (pos * self.temperature).mean()           # 温度除去してcos平均に
+
+            # neg: 対角と正例を除いた平均との差（cos）
+            neg = sim.clone()
+            neg.fill_diagonal_(0.0)
+            neg[torch.arange(n, device=device), torch.arange(n, device=device) + n] = 0.0
+            neg[torch.arange(n, device=device) + n, torch.arange(n, device=device)] = 0.0
+            denom = (2 * n) * (2 * n - 2)  # self と pos を除くので -2
+            neg_sim = (neg.sum() / (denom + 1e-8)) * self.temperature
+        return loss, pos_sim, neg_sim
 
     def training_step(self, batch, batch_idx):
         (x1, x2), _ = batch
         z1 = self.projection(self.encoder(x1))
         z2 = self.projection(self.encoder(x2))
-        loss = self.nt_xent(z1, z2)
+        loss, pos_sim, neg_sim = self.nt_xent(z1, z2, return_metrics=True)
 
-        # Log additional metrics
-        self.log("train_loss", loss)
-        self.log("temperature", self.temperature)
-        self.log("lr", self.trainer.optimizers[0].param_groups[0]["lr"])
+        # LR 取得
+        lr = None
+        if getattr(self, 'trainer', None) is not None and getattr(self.trainer, 'optimizers', None):
+            lr = self.trainer.optimizers[0].param_groups[0].get("lr", None)
+
+        dev = loss.device
+        self.log("train/loss", loss, on_step=True, on_epoch=True, prog_bar=True, sync_dist=True)
+        self.log("ssl/pos_sim", pos_sim.to(dev), on_step=True, on_epoch=True, sync_dist=True)
+        self.log("ssl/neg_sim", neg_sim.to(dev), on_step=True, on_epoch=True, sync_dist=True)
+        # あとは診断用なので sync_dist=False
+        self.log("ssl/temperature", float(self.temperature), on_step=True, on_epoch=True, sync_dist=False)
+        self.log("train/lr", lr, on_step=True, on_epoch=True, sync_dist=False)
 
         return loss

@@ -95,14 +95,39 @@ class SwAVModule(BaseSSLModule):
         with torch.no_grad():
             assignments = [self._sinkhorn_knopp(s) for s in scores[:2]]
 
-        # Compute swapped prediction loss
+        # --- SwAV swapped prediction loss ---
         loss = self._swapped_prediction_loss(scores, assignments)
 
-        self.log_dict(
-            {
-                "train_loss": loss,
-                "lr": self.trainer.optimizers[0].param_groups[0]["lr"],
-                "temperature": self.hparams.temperature,
-            }
-        )
+        # --- assignment diagnostics (global crops only) ---
+        with torch.no_grad():
+            # assignments: list of (B, K), each row sums to 1
+            a = torch.cat(assignments, dim=0)  # (2B, K)
+
+            # entropy: -sum p log p  (high -> uniform, low -> peaky)
+            assign_entropy = -(a * (a.clamp_min(1e-12).log())).sum(dim=1).mean()
+            # max prob (peaky-ness)
+            assign_maxprob = a.max(dim=1).values.mean()
+
+            # how many prototypes are used (argmax histogram)
+            used = torch.bincount(a.argmax(dim=1), minlength=self.hparams.n_prototypes)
+            active_prototypes = (used > 0).float().sum()
+
+        # --- lr safely ---
+        lr = None
+        if getattr(self, "trainer", None) is not None and getattr(self.trainer, "optimizers", None):
+            lr = self.trainer.optimizers[0].param_groups[0].get("lr", None)
+
+        # --- logging (consistent names) ---
+        # loss and assignment stats are meaningful across ranks -> sync_dist=True
+        self.log("train/loss", loss, on_step=True, on_epoch=True, prog_bar=True, sync_dist=True)
+        self.log("ssl/assign_entropy", assign_entropy, on_step=False, on_epoch=True, sync_dist=True)
+        self.log("ssl/assign_maxprob", assign_maxprob, on_step=False, on_epoch=True, sync_dist=True)
+        self.log("ssl/active_prototypes", active_prototypes, on_step=False, on_epoch=True, sync_dist=True)
+        # temperature is constant -> no sync
+        self.log("ssl/temperature", float(self.hparams.temperature), on_step=False, on_epoch=True, sync_dist=False)
+
+        # lr is diagnostic -> no sync, float to avoid cpu-tensor sync
+        if lr is not None:
+            self.log("train/lr", float(lr), on_step=True, on_epoch=True, sync_dist=False)
+
         return loss

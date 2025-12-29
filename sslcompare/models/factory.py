@@ -60,6 +60,7 @@ def build_model(method: str, **args):
         # lr/wd のデフォルトは MAE っぽい値に倒す方が安全です :contentReference[oaicite:3]{index=3}
         mae_kwargs = dict(
             lr=args.get("lr", 1.5e-4),
+            base_encoder="vit_mae",
             weight_decay=args.get("weight_decay", 0.05),
             warmup_epochs=args.get("warmup_epochs", 10),
         )

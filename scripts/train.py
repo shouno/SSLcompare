@@ -116,8 +116,8 @@ def cli_main():
         ),
         ModelCheckpoint(
             dirpath=run_dir,
-            filename="best-{epoch:03d}-{train_loss:.4f}",
-            monitor="train_loss",
+            filename="best-{epoch:03d}",
+            monitor="train/loss_epoch",
             mode="min",
             save_top_k=args.save_top_k,
             save_last=True,

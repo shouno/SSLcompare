@@ -61,19 +61,41 @@ class BYOLModule(BaseSSLModule):
             y1 = self.target_projection(self.target_encoder(x2))
             y2 = self.target_projection(self.target_encoder(x1))
 
-        # Compute loss
-        loss = (
-            2 - 2 * (
-                F.cosine_similarity(q1, y1.detach(), dim=1).mean()
-                + F.cosine_similarity(q2, y2.detach(), dim=1).mean()
-            )
-            / 2
-        )
+        # --- loss を構成する cos を先に計算（ログにも使う） ---
+        cos1 = F.cosine_similarity(q1, y1.detach(), dim=1).mean()
+        cos2 = F.cosine_similarity(q2, y2.detach(), dim=1).mean()
+        cos_mean = 0.5 * (cos1 + cos2)
+
+        loss = 2 - 2 * cos_mean  # 表現が一致するほど loss↓（BYOLの典型形）
 
         # Log metrics
-        self.log("train_loss", loss)
-        self.log("ema_decay", self.ema_decay)
-        self.log("lr", self.trainer.optimizers[0].param_groups[0]["lr"])
+        # --- 崩壊チェック（分散が0に寄ると危ない）---
+        with torch.no_grad():
+            # BYOLは projection/prediction 後より、projection 出力の分散を見ることが多い
+            # ここでは q の分散でも簡易診断として十分
+            q_std = q1.std(dim=0).mean()
+            y_std = y1.std(dim=0).mean()
+            q_norm = q1.norm(dim=1).mean()
+            y_norm = y1.norm(dim=1).mean()
+        # --- lr（安全に） ---
+        lr = None
+        if getattr(self, "trainer", None) is not None and getattr(self.trainer, "optimizers", None):
+            lr = self.trainer.optimizers[0].param_groups[0].get("lr", None)
+
+        # --- ログ（命名統一） ---
+        # loss/cos/std は epoch 比較に使えるので sync_dist=True
+        self.log("train/loss", loss, on_step=True, on_epoch=True, prog_bar=True, sync_dist=True)
+        self.log("ssl/cos_sim", cos_mean, on_step=True, on_epoch=True, sync_dist=True)
+        self.log("repr/q_std", q_std, on_step=True, on_epoch=True, sync_dist=True)
+        self.log("repr/y_std", y_std, on_step=True, on_epoch=True, sync_dist=True)
+        # norm は診断用なので好みで（同期してもOK）
+        self.log("repr/q_norm", q_norm, on_step=True, on_epoch=True, sync_dist=True)
+        self.log("repr/y_norm", y_norm, on_step=True, on_epoch=True, sync_dist=True)
+
+        # これは定数/診断：同期不要（floatのままでOK）
+        self.log("ssl/ema_decay", float(self.ema_decay), on_step=False, on_epoch=True, sync_dist=False)
+        if lr is not None:
+            self.log("train/lr", float(lr), on_step=True, on_epoch=True, sync_dist=False)
 
         return loss
 
