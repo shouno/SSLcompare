@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from .base import BaseSSLModule
-from .common import ProjectionMLP, PredictionMLP
+from .utils import ProjectionMLP, PredictionMLP
 
 
 class PatchEmbed(nn.Module):
@@ -75,19 +75,13 @@ class MAEModule(BaseSSLModule):
         decoder_depth=8,
         decoder_num_heads=16,
         mask_ratio=0.75,
-        **kwargs
+        base_encoder: str | None = None,
+        **kwargs,
     ):
-        # CIFAR-10用の調整
-        if img_size == 224 and patch_size == 4:  # CIFAR-10の場合
-            img_size = 32
-            # より小さいモデルを使用
-            embed_dim = 384
-            encoder_depth = 6
-            num_heads = 6
-            decoder_embed_dim = 256
-            decoder_depth = 4
-            decoder_num_heads = 8
-
+        if base_encoder is None:
+            base_encoder = kwargs.pop("base_encoder", None)
+        if base_encoder is not None and base_encoder != "vit_mae":
+            raise ValueError(f"MAEModule requires base_encoder='vit_mae'. Got: {base_encoder}")
         # Override base_encoder as MAE uses a specific ViT architecture
         super().__init__(base_encoder="vit_mae", **kwargs)
         self.save_hyperparameters()
@@ -223,21 +217,52 @@ class MAEModule(BaseSSLModule):
         return loss
 
     def training_step(self, batch, batch_idx):
-        # MAE uses a single image, not two views
         imgs, _ = batch
+
+        B, C, H, W = imgs.shape
+        p = self.patch_embed.patch_size
+        assert H == self.hparams.img_size and W == self.hparams.img_size, \
+            f"Input size {H}x{W} != model img_size {self.hparams.img_size}. Check transforms."
+        assert H % p == 0 and W % p == 0, \
+            f"Input size {H}x{W} must be divisible by patch_size={p}."
 
         latent, mask, ids_restore = self.forward_encoder(imgs, self.hparams.mask_ratio)
         pred = self.forward_decoder(latent, ids_restore)
         loss = self.forward_loss(imgs, pred, mask)
+        # ---- MAE diagnostics ----
+        with torch.no_grad():
+            # 予測が潰れてないか（分散が極端に小さいと危険）
+            pixel_var = pred.var()
 
-        self.log_dict(
-            {
-                "train_loss": loss,
-                "lr": self.trainer.optimizers[0].param_groups[0]["lr"],
-                "mask_ratio": self.hparams.mask_ratio,
-            }
-        )
+            # 実際のマスク率（バグ検知）
+            mask_mean = mask.float().mean()
+
+            # 参考：全パッチでのMSE（lossはマスク部のみなので補助として）
+            target = self._patchify(imgs)
+            recon_mse_all = (pred - target).pow(2).mean()
+
+        # ---- lr safely ----
+        lr = None
+        if getattr(self, "trainer", None) is not None and getattr(self.trainer, "optimizers", None):
+            lr = self.trainer.optimizers[0].param_groups[0].get("lr", None)
+
+        # ---- logging (consistent names + DDP safe) ----
+        self.log("train/loss", loss, on_step=True, on_epoch=True, prog_bar=True, sync_dist=True)
+
+        # epochで見れば十分な診断（GPUテンソルなので sync_dist=True でOK）
+        self.log("ssl/pixel_var", pixel_var, on_step=False, on_epoch=True, sync_dist=True)
+        self.log("ssl/recon_mse_all", recon_mse_all, on_step=False, on_epoch=True, sync_dist=True)
+        self.log("ssl/mask_mean", mask_mean, on_step=False, on_epoch=True, sync_dist=True)
+
+        # 定数は同期不要（floatにして事故回避）
+        self.log("ssl/mask_ratio", float(self.hparams.mask_ratio), on_step=False, on_epoch=True, sync_dist=False)
+
+        if lr is not None:
+            self.log("train/lr", float(lr), on_step=True, on_epoch=True, sync_dist=False)
+
         return loss
+
+
 
     def configure_optimizers(self):
         # MAE typically uses AdamW with a different schedule
@@ -248,7 +273,9 @@ class MAEModule(BaseSSLModule):
             betas=(0.9, 0.95),
         )
         # Cosine scheduler with warmup
-        t_max = max(1, self.trainer.max_epochs - int(self.hparams.get("warmup_epochs", 10)))
+        t_max = max(
+            1, self.trainer.max_epochs - int(self.hparams.get("warmup_epochs", 10))
+        )
         sched = torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=t_max)
 
         return {

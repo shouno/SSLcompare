@@ -1,13 +1,18 @@
 #!/bin/bash
 
+TRAIN_PY=scripts/train.py
+DATASET=cifar10
+DATAFOLDER=/workspace/data
+MAXEPOCHS=200
+
 # SimCLR/BYOL/SimSiam
-python3 main.py --method simclr  --dataset cifar10 --data_dir /workspace/data_dir --batch_size 256 --max_epochs 10 --save_every_n_epochs 2
-#python3 main.py --method byol    --dataset cifar10 --data_dir /workspace/data_dir --batch_size 256 --max_epochs 200
-#python3 main.py --method simsiam --dataset cifar10 --data_dir /workspace/data_dir --batch_size 256 --max_epochs 200
-#python3 main.py --method barlow  --dataset cifar10 --data_dir /workspace/data_dir --batch_size 256 --max_epochs 200
+python3 $TRAIN_PY --method simclr       --dataset $DATASET --data_dir $DATAFOLDER/$DATASET --max_epochs $MAXEPOCHS
+python3 $TRAIN_PY --method byol         --dataset $DATASET --data_dir $DATAFOLDER/$DATASET --max_epochs $MAXEPOCHS
+python3 $TRAIN_PY --method simsiam      --dataset $DATASET --data_dir $DATAFOLDER/$DATASET --max_epochs $MAXEPOCHS
+python3 $TRAIN_PY --method barlowtwins  --dataset $DATASET --data_dir $DATAFOLDER/$DATASET --max_epochs $MAXEPOCHS
 
 # SwAV (メモリ使用量が多い)
-#python3 main.py --method swav    --dataset cifar10 --data_dir /workspace/data_dir --batch_size 256 --max_epochs 200
+python3 $TRAIN_PY --method swav         --dataset $DATASET --data_dir $DATAFOLDER/$DATASET --max_epochs $MAXEPOCHS
 
-# MAE (メモリ使用量が多い)
-python3 main.py --method mae     --dataset cifar10 --data_dir /workspace/data_dir --batch_size 256 --max_epochs 10 --save_every_n_epochs 2
+# MAE (メモリ使用量が多い), エンコーダを ViT-MAE に固定, lr を低めに設定
+python3 $TRAIN_PY --method mae          --dataset $DATASET --data_dir $DATAFOLDER/$DATASET --lr 1e-4 --base_encoder vit_mae --max_epochs $MAXEPOCHS --batch_size 256 

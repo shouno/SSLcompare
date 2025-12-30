@@ -1,0 +1,17 @@
+{
+    "cSpell.ignoreWords": [
+        "BYOL",
+        "DATAFOLDER",
+        "PYTHONPATH",
+        "barlowtwins",
+        "cifar",
+        "datamodules",
+        "hparams",
+        "hyperparams",
+        "imagenet",
+        "simclr",
+        "simsiam",
+        "sslcompare",
+        "swav"
+    ]
+}

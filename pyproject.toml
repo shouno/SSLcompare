@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sslcompare"
+version = "0.1.0"
+description = "Self-supervised learning comparison framework"
+authors = [{ name = "Hayaru Shouno" }]
+readme = "README.md"
+requires-python = ">=3.9"
+
+dependencies = [
+    "numpy",
+    "scipy",
+    "matplotlib",
+    "pillow",
+    "six",
+    "ipython",
+    "ipykernel",
+    "joblib",
+    "pandas",
+    "torchvision",
+    "lightning",
+    "wandb",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["sslcompare*"]
