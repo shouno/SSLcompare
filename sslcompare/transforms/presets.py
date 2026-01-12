@@ -104,7 +104,9 @@ def build_swav_multi_crops(
     return MultiCropsTransform(global_tf, local_tf, n_local_crops=n_local_crops)
 
 
-def build_mae_single_view(spec: DatasetSpecs, *, img_size: int = 224, scale=(0.2, 1.0)) -> Callable:
+def build_mae_single_view(
+    spec: DatasetSpecs, *, img_size: int = 224, scale=(0.2, 1.0)
+) -> Callable:
     """
     MAE: 単一 view
     出力解像度はモデル側のimg_sizeに合わせて固定する
@@ -113,6 +115,21 @@ def build_mae_single_view(spec: DatasetSpecs, *, img_size: int = 224, scale=(0.2
         [
             T.RandomResizedCrop(img_size, scale=scale),
             T.RandomHorizontalFlip(),
+            T.ToTensor(),
+            T.Normalize(spec.mean, spec.std),
+        ]
+    )
+
+
+def build_eval_single_view(spec: DatasetSpecs) -> Callable:
+    """
+    評価用（kNN / linear / collapse）
+    ランダム性なし・再現性重視
+    """
+    return T.Compose(
+        [
+            T.Resize(spec.input_size),
+            T.CenterCrop(spec.input_size),
             T.ToTensor(),
             T.Normalize(spec.mean, spec.std),
         ]
