@@ -51,5 +51,5 @@ def build_transform(dataset: str, method: str, **kwargs) -> Callable:
 
 
 def build_eval_transform(dataset: str, **kwargs):
-    spec = get_dataset_specs(dataset)
+    spec = get_specs(dataset)
     return build_eval_single_view(spec)

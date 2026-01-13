@@ -66,6 +66,20 @@ def build_ssl_two_crops(
     )
     return TwoCropsTransform(base)
 
+def build_eval_single_view(spec):
+    """
+    Evaluation transform for kNN/linear/collapse:
+    deterministic + single-view (no randomness).
+    """
+    import torchvision.transforms as T
+    return T.Compose(
+        [
+            T.Resize(spec.input_size),
+            T.CenterCrop(spec.input_size),
+            T.ToTensor(),
+            T.Normalize(spec.mean, spec.std),
+        ]
+    )
 
 def build_swav_multi_crops(
     spec: DatasetSpecs,

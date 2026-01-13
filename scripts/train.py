@@ -9,10 +9,11 @@ import lightning.pytorch as pl
 from lightning.pytorch.callbacks import ModelCheckpoint, LearningRateMonitor
 from lightning.pytorch.loggers import WandbLogger
 
-from sslcompare.transforms.factory import build_transform
+from sslcompare.transforms.factory import build_transform, build_eval_transform
 from sslcompare.models.factory import build_model
 from sslcompare.datamodules.factory import build_datamodule
 
+from sslcompare.evaluators.knn import KNNConfig
 from sslcompare.callbacks.knn_callback import KNNCallback
 
 
@@ -92,6 +93,7 @@ def cli_main():
         img_size=args.img_size,
         # 将来ここに jitter_strength 等を足しても train.py は変えない方針
     )
+    eval_transform = build_eval_transform(dataset=args.dataset)
 
     # 2) datamodule
     dm_kwargs = dict(
@@ -99,8 +101,11 @@ def cli_main():
         num_workers=args.num_workers,
         stl10_split=args.stl10_split,
     )
+
     dm = build_datamodule(
-        dataset=args.dataset, data_dir=args.data_dir, transform=transform, **dm_kwargs
+        dataset=args.dataset, data_dir=args.data_dir, 
+        transform=transform, eval_transform=eval_transform,
+        **dm_kwargs
     )
 
     # 3) model
@@ -124,7 +129,7 @@ def cli_main():
             save_last=True,
         ),
         LearningRateMonitor(logging_interval="epoch"),
-        KNNCallback(),
+        KNNCallback(every_n_epochs=5, cfg=KNNConfig(k=20)),
     ]
 
     logger = WandbLogger(project=args.project, name=run_name, save_dir=run_dir)

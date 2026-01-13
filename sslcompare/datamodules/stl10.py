@@ -22,7 +22,9 @@ class STL10DataModule(BaseSSLDataModule):
 
         self.eval_split_train = eval_split_train
         self.eval_split_val = eval_split_val
-        self.eval_transform = eval_transform or transform
+        # Important: eval_transform must be deterministic single-view.
+        # Do NOT default to `transform` (which may be TwoCrops for SSL).
+        self.eval_transform = eval_transform
 
     def prepare_data(self):
         if self.download:
@@ -31,6 +33,11 @@ class STL10DataModule(BaseSSLDataModule):
             STL10(root=self.data_dir, split=self.eval_split_val, download=True)
 
     def setup(self, stage=None):
+        if self.eval_transform is None:
+            raise RuntimeError(
+                "eval_transform is None. You must pass a single-view eval_transform "
+                "(e.g., Resize/CenterCrop + ToTensor + Normalize) for kNN/linear evaluation."
+            )
         # SSL 学習用（unlabeled 等）
         self.train_dataset = STL10(
             root=self.data_dir,
