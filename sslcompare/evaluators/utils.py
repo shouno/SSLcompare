@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from typing import Optional, Tuple
+from collections.abc import Sequence
 
 import torch
 import torch.nn.functional as F
@@ -45,6 +46,20 @@ def collect_embeddings(
             raise ValueError("Eval dataloader must yield (x, y) or (x, y, ...).")
 
         x, y = batch[0], batch[1]
+
+        # --- Robustness: handle SSL-style multi-view inputs ---
+        # If eval dataset accidentally uses TwoCrops/MultiCrops transform,
+        # x can be a list/tuple of tensors. For evaluation, we use the first view.
+        if isinstance(x, (list, tuple)):
+            if len(x) == 0:
+                raise ValueError("Received empty list/tuple for x in eval batch.")
+            x = x[0]
+        # Some datasets may wrap a single tensor in a sequence-like container.
+        # Uncomment if you ever see that:
+        # if isinstance(x, Sequence) and not torch.is_tensor(x):
+        #     x = x[0]
+        # ------------------------------------------------------
+
         x = x.to(device, non_blocking=True)
         y = y.to(device, non_blocking=True)
 
