@@ -3,13 +3,13 @@
 TRAIN_PY=scripts/train.py
 DATASET=stl10
 DATAFOLDER=/workspace/data
-MAXEPOCHS=200
+MAXEPOCHS=20
 
 # SimCLR/BYOL/SimSiam
-#python3 $TRAIN_PY --method simclr       --dataset $DATASET --data_dir $DATAFOLDER/$DATASET --max_epochs $MAXEPOCHS
+python3 $TRAIN_PY --method simclr       --dataset $DATASET --data_dir $DATAFOLDER/$DATASET --max_epochs $MAXEPOCHS
 python3 $TRAIN_PY --method byol         --dataset $DATASET --data_dir $DATAFOLDER/$DATASET --max_epochs $MAXEPOCHS
 python3 $TRAIN_PY --method simsiam      --dataset $DATASET --data_dir $DATAFOLDER/$DATASET --max_epochs $MAXEPOCHS
-#python3 $TRAIN_PY --method barlowtwins  --dataset $DATASET --data_dir $DATAFOLDER/$DATASET --max_epochs $MAXEPOCHS
+python3 $TRAIN_PY --method barlowtwins  --dataset $DATASET --data_dir $DATAFOLDER/$DATASET --max_epochs $MAXEPOCHS
 
 # SwAV (メモリ使用量が多い)
 #python3 $TRAIN_PY --method swav         --dataset $DATASET --data_dir $DATAFOLDER/$DATASET --max_epochs $MAXEPOCHS

@@ -61,12 +61,10 @@ class KNNCallback(Callback):
 
         Xtr, ytr = collect_embeddings(
             trainer, pl_module, train_loader,
-            normalize=self.cfg.normalize,
             max_samples=self.max_train_samples,
         )
         Xva, yva = collect_embeddings(
             trainer, pl_module, val_loader,
-            normalize=self.cfg.normalize,
             max_samples=self.max_val_samples,
         )
 
