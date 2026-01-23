@@ -41,8 +41,8 @@ def parse_args():
     p.add_argument(
         "--lr", type=float, default=0.01
     )  # 多分小規模データセットだと 0.2 は大きすぎる
-    p.add_argument("--weight_decay", type=float, default=1e-6)
-    p.add_argument("--warmup_epochs", type=int, default=10)
+    p.add_argument("--weight_decay", type=float, default=1e-4) # for small datasets
+    p.add_argument("--warmup_epochs", type=int, default=2) # for small datasets
 
     # method knobs
     p.add_argument("--temperature", type=float, default=0.2)
