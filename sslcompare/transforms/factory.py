@@ -8,7 +8,7 @@ from typing import Callable
 
 from .specs import get_specs
 from .presets import build_ssl_two_crops, build_swav_multi_crops, build_mae_single_view
-
+from .presets import build_eval_single_view
 
 # method名で Transform のグルーピングをしておく．
 _TWO_CROPS_METHODS = {
@@ -40,9 +40,16 @@ def build_transform(dataset: str, method: str, **kwargs) -> Callable:
 
     if m in _MAE_METHODS:
         return build_mae_single_view(
-            spec, 
-            img_size=kwargs.get("img_size", 224), # とりあえずImageNet準拠サイズになおす
-            scale=kwargs.get("scale", (0.2, 1.0))
+            spec,
+            img_size=kwargs.get(
+                "img_size", 224
+            ),  # とりあえずImageNet準拠サイズになおす
+            scale=kwargs.get("scale", (0.2, 1.0)),
         )
 
     raise ValueError(f"Unknown method: {method}")
+
+
+def build_eval_transform(dataset: str, **kwargs):
+    spec = get_specs(dataset)
+    return build_eval_single_view(spec)

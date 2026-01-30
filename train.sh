@@ -1,7 +1,7 @@
 #!/bin/bash
 
 TRAIN_PY=scripts/train.py
-DATASET=cifar10
+DATASET=stl10
 DATAFOLDER=/workspace/data
 MAXEPOCHS=200
 

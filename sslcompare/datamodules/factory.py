@@ -7,9 +7,9 @@ from .stl10 import STL10DataModule
 from .imagenet import ImageNetDataModule
 
 _ALLOWED_KWARGS: dict[str, set[str]] = { # 取れる引数を決めておく
-    "cifar10": {"batch_size", "num_workers"},
-    "stl10": {"batch_size", "num_workers", "stl10_split"},
-    "imagenet": {"batch_size", "num_workers"},  # 必要なら増やす
+    "cifar10": {"batch_size", "num_workers", "eval_batch_size", "eval_transform"},
+    "stl10": {"batch_size", "num_workers", "eval_batch_size", "eval_transform", "stl10_split"},
+    "imagenet": {"batch_size", "num_workers", "eval_batch_size", "eval_transform"},  # 必要なら増やす
 }
 
 def _filter_kwargs(dataset: str, kwargs: Dict[str, Any], *, strict: bool = False) -> Dict[str, Any]:

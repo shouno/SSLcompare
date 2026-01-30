@@ -16,7 +16,7 @@ class BaseSSLModule(pl.LightningModule):
         lr: float = 0.2,
         weight_decay: float = 1e-6,
         warmup_epochs: int = 10,
-        **kwargs
+        **kwargs,
     ):
         super().__init__()
         self.save_hyperparameters()
@@ -44,6 +44,13 @@ class BaseSSLModule(pl.LightningModule):
             return 2048
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return self.encoder(x)
+
+    def forward_features(self, x: torch.Tensor) -> torch.Tensor:
+        """
+        特徴取り出し，forward()と別にしているのは，callback でこちらを利用するため．
+        forward() は，学習とか下流タスクにつなげるため，変にいじるよりインターフェースを付け加える
+        """
         return self.encoder(x)
 
     # Override in subclasses

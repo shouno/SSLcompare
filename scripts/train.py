@@ -9,9 +9,12 @@ import lightning.pytorch as pl
 from lightning.pytorch.callbacks import ModelCheckpoint, LearningRateMonitor
 from lightning.pytorch.loggers import WandbLogger
 
-from sslcompare.transforms.factory import build_transform
+from sslcompare.transforms.factory import build_transform, build_eval_transform
 from sslcompare.models.factory import build_model
 from sslcompare.datamodules.factory import build_datamodule
+
+from sslcompare.evaluators.knn import KNNConfig
+from sslcompare.callbacks.knn_callback import KNNCallback
 
 
 def parse_args():
@@ -35,9 +38,11 @@ def parse_args():
 
     # base model/optim
     p.add_argument("--base_encoder", default="resnet50")
-    p.add_argument("--lr", type=float, default=0.01) # 多分小規模データセットだと 0.2 は大きすぎる
-    p.add_argument("--weight_decay", type=float, default=1e-6)
-    p.add_argument("--warmup_epochs", type=int, default=10)
+    p.add_argument(
+        "--lr", type=float, default=0.01
+    )  # 多分小規模データセットだと 0.2 は大きすぎる
+    p.add_argument("--weight_decay", type=float, default=1e-4) # for small datasets
+    p.add_argument("--warmup_epochs", type=int, default=2) # for small datasets
 
     # method knobs
     p.add_argument("--temperature", type=float, default=0.2)
@@ -88,6 +93,7 @@ def cli_main():
         img_size=args.img_size,
         # 将来ここに jitter_strength 等を足しても train.py は変えない方針
     )
+    eval_transform = build_eval_transform(dataset=args.dataset)
 
     # 2) datamodule
     dm_kwargs = dict(
@@ -95,10 +101,10 @@ def cli_main():
         num_workers=args.num_workers,
         stl10_split=args.stl10_split,
     )
+
     dm = build_datamodule(
-        dataset=args.dataset,
-        data_dir=args.data_dir,
-        transform=transform,
+        dataset=args.dataset, data_dir=args.data_dir, 
+        transform=transform, eval_transform=eval_transform,
         **dm_kwargs
     )
 
@@ -123,6 +129,7 @@ def cli_main():
             save_last=True,
         ),
         LearningRateMonitor(logging_interval="epoch"),
+        KNNCallback(every_n_epochs=5, cfg=KNNConfig(k=20)),
     ]
 
     logger = WandbLogger(project=args.project, name=run_name, save_dir=run_dir)
