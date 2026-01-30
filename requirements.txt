@@ -2,14 +2,15 @@ numpy
 scipy
 matplotlib
 #
+Pillow
+jupyter
 ipykernel
 ipython
 joblib
 pandas
-Pillow
 six
 #
 #torch
-torchvision
+#torchvision
 lightning
 wandb

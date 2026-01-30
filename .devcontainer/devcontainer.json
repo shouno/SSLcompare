@@ -14,7 +14,7 @@
 		}
 	},
 	// pyproject.toml に dependencies 書いているので requirements.txt は不要？
-	"postCreateCommand": "python3 -m venv .venv && . .venv/bin/activate && python3 -m pip install -U pip setuptools wheel && pip install -e .",
+	"postCreateCommand": "bash -lc 'set -euo pipefail; if [ ! -d .venv ]; then python3 -m venv .venv; fi; source .venv/bin/activate; python -m pip install -U pip setuptools wheel; python -m pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124; python -m pip install -e .'",
 	// 2. GPUを有効にするための実行時引数 ★最重要★
 	// これにより、コンテナがホストマシンの全GPUにアクセスできるようになります。
 	"runArgs": [
@@ -37,11 +37,11 @@
 			// コンテナ内のVSCodeの設定
 			"settings": {
 				"terminal.integrated.defaultProfile.linux": "bash",
-				"python.defaultInterpreterPath": "/usr/bin/python3",
+				"python.defaultInterpreterPath": "/workspace/.venv/bin/python",
+				"python.terminal.activateEnvironment": true,
 				"python.analysis.autoImportCompletions": true,
 				"python.analysis.extraPaths": [
 					"${containerWorkspaceFolder}"
-					// "./sslcompare"
 				]
 			}
 		}
@@ -51,7 +51,4 @@
 	"workspaceFolder": "/workspace",
 	// 5. コンテナに接続するユーザー
 	"remoteUser": "${localEnv:USER}"
-	//"remoteEnv": {
-	//	"PYTHONPATH": "${containerWorkspaceFolder}/sslcompare:${PYTHONPATH}"
-	//}
 }

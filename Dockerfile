@@ -1,10 +1,10 @@
 # 1. ベースイメージの選択
 # サーバーのNVIDIAドライバと互換性のあるCUDAバージョンを選択してください。
-# 例: CUDA 12.1, cuDNN 8, Ubuntu 22.04 の開発用イメージ
-ARG CUDA_VERSION=12.1.1
-ARG CUDNN_VERSION=8
+# 例: CUDA 12.5.1, cuDNN 8, Ubuntu 22.04 のruntimeイメージ
+ARG CUDA_VERSION=12.5.1
+#ARG CUDNN_VERSION=8
 ARG OS_VERSION=ubuntu22.04
-FROM nvidia/cuda:${CUDA_VERSION}-cudnn${CUDNN_VERSION}-devel-${OS_VERSION}
+FROM nvidia/cuda:${CUDA_VERSION}-cudnn-runtime-${OS_VERSION}
 
 # 対話的なプロンプトを無効化
 ENV DEBIAN_FRONTEND=noninteractive
@@ -41,17 +41,7 @@ RUN chsh -s /bin/bash ${USERNAME}
 COPY --chown=${USERNAME}:${USERNAME} .bashrc /home/${USERNAME}/.bashrc
 COPY --chown=${USERNAME}:${USERNAME} .tmux.conf /home/${USERNAME}/.tmux.conf
 
-# 4. Pythonライブラリのインストール
-# この時点ではrootユーザーで実行しています。
-RUN python3 -m pip install --no-cache-dir torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
-
-
-# 5. 次にrequirements.txtの内容をインストール
-# PyTorchがすでにあるため、依存関係として再インストールされることはありません。
-COPY --chown=${USERNAME}:${USERNAME} requirements.txt /tmp/requirements.txt
-RUN python3 -m pip install --no-cache-dir -r /tmp/requirements.txt
-
-# 6. ワークスペースの設定
+# 4. ワークスペースの設定
 # コンテナ内の作業ディレクトリを指定します。
 USER $USERNAME
 WORKDIR /workspace
