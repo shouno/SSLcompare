@@ -1,0 +1,30 @@
+services:
+  dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        USERNAME: ${USERNAME:-vscode}
+        USER_UID: ${USER_UID:-1000}
+        USER_GID: ${USER_GID:-1000}
+
+    # 旧 runArgs 相当
+    gpus: all
+    shm_size: "8g"
+
+    # 旧 workspaceMount 相当（compose側で正本化）
+    volumes:
+      - .:/workspace:cached
+      - datasets:/datasets:ro
+
+    working_dir: /workspace
+    environment:
+      - DATA_ROOT=/datasets
+
+volumes:
+  datasets:
+    driver: local
+    driver_opts:
+      type: "nfs"
+      o: "addr=${NFS_ADDR},nfsvers=4,ro"
+      device: ":${NFS_EXPORT}"
