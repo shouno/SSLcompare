@@ -1,0 +1,20 @@
+# runtime
+max_epochs: 200
+batch_size: 256
+num_workers: 8
+precision: "16-mixed"
+log_every_n_steps: 50
+
+# model/optim
+base_encoder: "resnet50"
+lr: 0.01
+weight_decay: 1e-4
+warmup_epochs: 2
+
+# ckpt
+checkpoint_root: "/workspace/runs_local/checkpoints"
+save_every_n_epochs: 20
+save_top_k: 3
+
+# wandb
+project: "sslcompare"

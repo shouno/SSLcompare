@@ -1,0 +1,2 @@
+dataset: "stl10"
+data_dir: "/datasets/stl10"

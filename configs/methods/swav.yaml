@@ -1,0 +1,5 @@
+method: "swav"
+n_prototypes: 3000
+n_local_crops: 6
+sinkhorn_eps: 0.05
+sinkhorn_iters: 3

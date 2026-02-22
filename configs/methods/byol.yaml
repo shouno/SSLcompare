@@ -1,0 +1,2 @@
+method: "byol"
+ema_decay: 0.996
