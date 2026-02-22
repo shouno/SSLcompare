@@ -26,15 +26,24 @@ services:
     volumes:
       - .:/workspace:cached
       - datasets:/datasets:ro
+      - train_logs:/train_logs
 
     working_dir: /workspace
     environment:
       - DATA_ROOT=/datasets
+      - LOG_ROOT=/train_logs
 
 volumes:
   datasets:
     driver: local
     driver_opts:
       type: "nfs"
-      o: "addr=${NFS_ADDR},nfsvers=4,ro"
-      device: ":${NFS_EXPORT}"
+      o: "addr=${NFS_DATA_ADDR:-192.168.128.9},nfsvers=4,ro"
+      device: ":${NFS_DATA_EXPORT}"
+
+  train_logs:
+    driver: local
+    driver_opts:
+      type: "nfs"
+      o: "addr=${NFS_LOGS_ADDR:-192.168.128.248},rw,noatime"
+      device: ":${NFS_LOGS_EXPORT}"

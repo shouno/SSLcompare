@@ -2,9 +2,13 @@
 
 TRAIN_PY=scripts/train.py
 DATASET=stl10
+MAXEPOCHS=200
+
 # DATAFOLDER=/workspace/data
 DATAFOLDER=/datasets/$DATASET
-MAXEPOCHS=200
+
+# LOG_FOLDER
+LOG_FOLDER=/train_logs
 
 # SimCLR/BYOL/SimSiam
 python3 $TRAIN_PY --method simclr       --dataset $DATASET --data_dir $DATAFOLDER --max_epochs $MAXEPOCHS
