@@ -5,6 +5,8 @@ import argparse
 import os
 from datetime import datetime
 
+from pathlib import Path
+
 import lightning.pytorch as pl
 from lightning.pytorch.callbacks import ModelCheckpoint, LearningRateMonitor
 from lightning.pytorch.loggers import WandbLogger
@@ -84,6 +86,18 @@ def cli_main():
     run_name = args.run_name or f"{args.method}_{args.base_encoder}_{args.dataset}_{ts}"
     run_dir = os.path.join(args.checkpoint_root, run_name)
     os.makedirs(run_dir, exist_ok=True)
+
+    def mark(path: str, tag: str):
+        Path(path).mkdir(parents=True, exist_ok=True)
+        Path(path, f"_who_{tag}.txt").write_text(
+            f"ts={datetime.now().isoformat()}\n"
+            f"pid={os.getpid()}\n"
+            f"ppid={os.getppid()}\n"
+            f"env_RANK={os.environ.get('RANK')}\n"
+            f"env_LOCAL_RANK={os.environ.get('LOCAL_RANK')}\n"
+            f"env_WORLD_SIZE={os.environ.get('WORLD_SIZE')}\n"
+        )
+    mark(run_dir, "after_makedirs")
 
     # 1) transform
     transform = build_transform(
