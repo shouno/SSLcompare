@@ -74,7 +74,7 @@ def parse_args():
 
     # wandb
     p.add_argument("--project", default="sslcompare")
-    p.add_argument("--run_name", default=None)
+    p.add_argument("--run_name", required=True) # ログ管理のため必ず指定させる
 
     return p.parse_args()
 
@@ -82,22 +82,9 @@ def parse_args():
 def cli_main():
     args = parse_args()
 
-    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-    run_name = args.run_name or f"{args.method}_{args.base_encoder}_{args.dataset}_{ts}"
+    run_name = args.run_name
     run_dir = os.path.join(args.checkpoint_root, run_name)
     os.makedirs(run_dir, exist_ok=True)
-
-    def mark(path: str, tag: str):
-        Path(path).mkdir(parents=True, exist_ok=True)
-        Path(path, f"_who_{tag}.txt").write_text(
-            f"ts={datetime.now().isoformat()}\n"
-            f"pid={os.getpid()}\n"
-            f"ppid={os.getppid()}\n"
-            f"env_RANK={os.environ.get('RANK')}\n"
-            f"env_LOCAL_RANK={os.environ.get('LOCAL_RANK')}\n"
-            f"env_WORLD_SIZE={os.environ.get('WORLD_SIZE')}\n"
-        )
-    mark(run_dir, "after_makedirs")
 
     # 1) transform
     transform = build_transform(

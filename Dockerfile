@@ -21,6 +21,7 @@ RUN apt-get update && apt-get install -y \
     python3-pip \
     python3-venv \
     tmux \
+    rsync \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
