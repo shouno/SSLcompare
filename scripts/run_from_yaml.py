@@ -77,7 +77,7 @@ def main() -> None:
     ap.add_argument(
         "--train_py",
         default="scripts/train.py",
-        help="Path to train.py (default: train.py)",
+        help="Path to train.py (default: scripts/train.py)",
     )
     ap.add_argument(
         "extra",
